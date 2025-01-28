@@ -1,0 +1,11 @@
+{
+  "name": "daily-affirmations-extension",
+  "version": "1.0.0",
+  "description": "Chrome extension for Daily Affirmations",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "devDependencies": {
+    "crypto": "^1.0.1"
+  }
+} 

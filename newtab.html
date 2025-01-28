@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daily Affirmations</title>
+
+    <!-- Local Fonts -->
+    <link rel="stylesheet" href="css/fonts.css" />
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/premium.css" />
+    <link rel="stylesheet" href="css/info-dialogs.css" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/shepherd.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Merriweather:wght@300;400;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+      rel="stylesheet"
+    />
+
+    <!-- Offline App -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#22c55e" />
+  </head>
+  <body class="font-fallback">
+    <div class="fullscreen-container">
+      <div id="background-overlay"></div>
+
+      <!-- Settings button -->
+      <button
+        id="settingsButton"
+        class="settings-button glass"
+        aria-label="Settings"
+      >
+        <i class="material-icons-round">settings</i>
+      </button>
+
+      <!-- Settings panel -->
+      <div id="settingsPanel" class="settings-panel glass hidden">
+        <h3>Settings</h3>
+        <div class="settings-group">
+          <h4>Display</h4>
+          <label class="setting-item">
+            <span>Show Weather</span>
+            <input type="checkbox" id="showWeather" checked />
+          </label>
+          <label class="setting-item">
+            <span>Show Clock</span>
+            <input type="checkbox" id="showClock" checked />
+          </label>
+        </div>
+
+        <div class="settings-group">
+          <h4>Theme</h4>
+          <label class="setting-item">
+            <span>Background Theme</span>
+            <select id="backgroundTheme">
+              <option value="nature">Nature</option>
+              <option value="minimal">Minimal</option>
+              <option value="architecture">Architecture</option>
+              <option value="abstract">Abstract</option>
+            </select>
+          </label>
+          <label class="setting-item">
+            <span>Card Style</span>
+            <select id="cardStyle">
+              <option value="glass">Glass</option>
+              <option value="solid">Solid</option>
+              <option value="minimal">Minimal</option>
+            </select>
+          </label>
+          <label class="setting-item">
+            <span>Font Style</span>
+            <select id="fontStyle">
+              <option value="default">Default</option>
+              <option value="serif">Serif</option>
+              <option value="monospace">Monospace</option>
+            </select>
+          </label>
+          <label class="setting-item">
+            <span>Text Color</span>
+            <input type="color" id="textColor" value="#FFFFFF" />
+          </label>
+        </div>
+
+        <button id="resetSettings" class="reset-button">
+          Reset to Defaults
+        </button>
+      </div>
+
+      <!-- Weather widget -->
+      <div
+        id="weather-widget"
+        class="weather glass draggable-widget"
+        aria-label="Weather information"
+      >
+        <div class="weather-main">
+          <div class="widget-handle">⋮</div>
+          <i class="material-icons-round" id="weatherIcon">cloud</i>
+          <div class="weather-info">
+            <span id="weatherTemp"></span>
+            <span id="weatherCity"></span>
+          </div>
+        </div>
+        <div class="weather-details">
+          <div class="weather-detail">
+            <i class="material-icons-round">water_drop</i>
+            <span id="weatherHumidity"></span>
+          </div>
+          <div class="weather-detail">
+            <i class="material-icons-round">air</i>
+            <span id="weatherWind"></span>
+          </div>
+          <div class="weather-detail">
+            <i class="material-icons-round">thermostat</i>
+            <span id="weatherFeelsLike"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Time widget -->
+      <div class="time-widget glass draggable-widget">
+        <div class="widget-handle">⋮</div>
+        <div class="time" id="time">00:00</div>
+        <div class="date" id="date">Loading...</div>
+      </div>
+
+      <!-- Focus mode button -->
+      <button
+        id="focusModeButton"
+        class="focus-mode-button glass"
+        title="Toggle Focus Mode"
+      >
+        <i class="material-icons-round focus-icon">center_focus_weak</i>
+        <i class="material-icons-round unfocus-icon">center_focus_strong</i>
+      </button>
+
+      <!-- Affirmation card -->
+      <div class="affirmation-card glass">
+        <p class="affirmation-text" id="affirmation">
+          Loading your daily affirmation...
+        </p>
+        <button class="affirmation-menu-button" aria-label="Affirmation menu">
+          <i class="material-icons-round">more_vert</i>
+        </button>
+        <div class="affirmation-actions">
+          <button class="action-button" data-action="refresh">
+            <i class="material-icons-round">refresh</i>
+            <span>New Affirmation</span>
+          </button>
+          <button class="action-button" data-action="copy">
+            <i class="material-icons-round">content_copy</i>
+            <span>Copy</span>
+          </button>
+          <button class="action-button" data-action="favorite">
+            <i class="material-icons-round">favorite_border</i>
+            <span>Add to Favorites</span>
+          </button>
+          <button class="action-button" data-action="manage-favorites">
+            <i class="material-icons-round">bookmarks</i>
+            <span>Manage Favorites</span>
+          </button>
+          <button class="action-button" data-action="share">
+            <i class="material-icons-round">share</i>
+            <span>Share</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Photo credit -->
+      <div class="photo-credit">
+        <button
+          class="save-background-button glass"
+          title="Save this background"
+        >
+          <i class="material-icons-round">bookmark_add</i>
+        </button>
+        <span
+          >Photo by
+          <a id="photo-credit-link" target="_blank" rel="noopener"
+            >Unknown</a
+          ></span
+        >
+        <span id="photo-location"></span>
+      </div>
+
+      <!-- Menu button -->
+      <button id="menuButton" class="menu-button glass">
+        <i class="material-icons-round">menu</i>
+      </button>
+
+      <!-- Menu panel -->
+      <div id="menuPanel" class="menu-panel glass hidden">
+        <div class="menu-header">
+          <h3>Daily Affirmation</h3>
+          <span class="premium-badge">Free</span>
+        </div>
+
+        <div class="menu-group">
+          <h4>My Collections</h4>
+          <ul>
+            <li id="favoritesButton" class="favorite-affirmations-item">
+              <i class="material-icons-round">favorite</i>
+              Favorite Affirmations
+            </li>
+            <li id="customAffirmationsButton">
+              <i class="material-icons-round">format_quote</i>
+              Custom Affirmations
+              <span class="premium-tag">Pro</span>
+            </li>
+            <li id="backgroundsButton">
+              <i class="material-icons-round">photo_library</i>
+              Saved Backgrounds
+            </li>
+          </ul>
+        </div>
+
+        <div class="menu-group">
+          <h4>Settings</h4>
+          <ul>
+            <li class="daily-reminders-item">
+              <i class="material-icons-round">notifications</i>
+              Daily Reminders
+              <span class="premium-tag">Pro</span>
+            </li>
+            <li>
+              <i class="material-icons-round">palette</i>
+              Theme Settings
+            </li>
+            <li>
+              <i class="material-icons-round">backup</i>
+              Backup & Sync
+              <span class="premium-tag">Pro</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="menu-footer">
+          <button class="menu-footer-btn" title="Help">
+            <i class="material-icons-round">help</i>
+            <span>Help</span>
+          </button>
+          <button class="menu-footer-btn" title="Send Feedback">
+            <i class="material-icons-round">feedback</i>
+            <span>Feedback</span>
+          </button>
+          <button class="menu-footer-btn" title="About">
+            <i class="material-icons-round">info</i>
+            <span>About</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Custom Affirmations Dialog -->
+      <div id="customAffirmationsDialog" class="dialog-base">
+        <div class="dialog-content">
+          <div class="dialog-header">
+            <h3>Custom Affirmations</h3>
+            <button class="close-button">
+              <i class="material-icons-round">close</i>
+            </button>
+          </div>
+
+          <div class="dialog-body">
+            <!-- Collection Tabs -->
+            <div class="collections-tabs">
+              <button class="tab-button active" data-collection="personal">Personal</button>
+              <button class="tab-button" data-collection="motivation">Motivation</button>
+              <button class="tab-button" data-collection="gratitude">Gratitude</button>
+              <button class="tab-button" data-collection="success">Success</button>
+            </div>
+
+            <!-- Affirmations List -->
+            <div class="affirmations-list">
+              <!-- Example Item (will be populated dynamically) -->
+              <div class="affirmation-item">
+                <p class="affirmation-text">I am capable of achieving anything I set my mind to.</p>
+                <div class="affirmation-actions">
+                  <button class="action-icon" data-action="use" title="Use this affirmation">
+                    <i class="material-icons-round">play_arrow</i>
+                  </button>
+                  <button class="action-icon" data-action="delete" title="Delete affirmation">
+                    <i class="material-icons-round">delete</i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Add New Affirmation -->
+            <div class="add-affirmation">
+              <input type="text" id="newAffirmation" placeholder="Type your affirmation..." />
+              <button class="add-button">
+                <i class="material-icons-round">add</i>
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Premium Dialog -->
+      <div class="premium-modal">
+        <div class="modal-content">
+          <button class="close-button" aria-label="Close modal">
+            <i class="material-icons-round">close</i>
+          </button>
+          <h2>Unlock Pro Features</h2>
+          <div class="features-grid">
+            <div class="feature-card">
+              <i class="material-icons-round">favorite</i>
+              <h3>Favorite Affirmations</h3>
+              <p>Save your favorite affirmations</p>
+            </div>
+            <div class="feature-card">
+              <i class="material-icons-round">share</i>
+              <h3>Share Affirmations</h3>
+              <p>Share your favorite affirmations</p>
+            </div>
+            <div class="feature-card">
+              <i class="material-icons-round">edit</i>
+              <h3>Custom Affirmations</h3>
+              <p>Create and manage your own affirmations</p>
+            </div>
+            <div class="feature-card">
+              <i class="material-icons-round">notifications</i>
+              <h3>Daily Reminders</h3>
+              <p>Get notified at your preferred time</p>
+            </div>
+          </div>
+          <div class="pricing-section">
+            <div class="plan monthly">
+              <div>
+                <h3>Monthly</h3>
+                <div class="price">$4.99<span>/month</span></div>
+                <ul>
+                  <li>All Pro Features</li>
+                  <li>Priority Support</li>
+                  <li>Cancel Anytime</li>
+                </ul>
+              </div>
+              <button class="upgrade-button" data-plan="monthly">
+                Choose Monthly
+              </button>
+            </div>
+            <div class="plan yearly best-value">
+              <div class="best-value-tag">Best Value</div>
+              <div>
+                <h3>Yearly</h3>
+                <div class="price">$39.99<span>/year</span></div>
+                <div class="save-tag">Save 33%</div>
+                <ul>
+                  <li>All Pro Features</li>
+                  <li>Priority Support</li>
+                  <li>Cancel Anytime</li>
+                  <li>2 Months Free</li>
+                </ul>
+              </div>
+              <button class="upgrade-button" data-plan="yearly">
+                Choose Yearly
+              </button>
+            </div>
+          </div>
+          <div class="trial-section">
+            <p>Not sure yet? Try Pro free for 7 days</p>
+            <button class="trial-button">Start Free Trial</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Backup Dialog -->
+      <div id="backupDialog" class="dialog-base">
+        <div class="dialog-content">
+          <div class="dialog-header">
+            <h3>Backup & Sync</h3>
+            <button class="close-button">
+              <i class="material-icons-round">close</i>
+            </button>
+          </div>
+          
+          <div class="dialog-body">
+            <!-- Cloud Sync Section -->
+            <div class="backup-section">
+              <h4>Cloud Sync Status</h4>
+              <div class="info-box">
+                <i class="material-icons-round">cloud_sync</i>
+                <p>Your data is synced across all your devices using Chrome Sync</p>
+              </div>
+            </div>
+
+            <!-- Local Backup Section -->
+            <div class="backup-section">
+              <h4>Local Backup</h4>
+              <div class="info-box">
+                <i class="material-icons-round">save</i>
+                <p>Create a backup file of your settings, favorites, and custom affirmations</p>
+              </div>
+              <div class="backup-button-group">
+                <button class="backup-button primary">
+                  <i class="material-icons-round">download</i>
+                  Download Backup
+                </button>
+                <button class="backup-button secondary">
+                  <i class="material-icons-round">upload</i>
+                  Restore from Backup
+                </button>
+              </div>
+            </div>
+
+            <!-- Auto Backup Section -->
+            <div class="backup-section">
+              <h4>Auto Backup</h4>
+              <div class="info-box">
+                <i class="material-icons-round">schedule</i>
+                <p>Your data is automatically backed up every day</p>
+              </div>
+              <div class="status-box success">
+                <i class="material-icons-round">check_circle</i>
+                <p>Last backup completed successfully</p>
+              </div>
+              <p class="last-backup-time">Last backup: Today at 15:30</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/shepherd.min.js"></script>
+    <script type="module" src="js/init.js"></script>
+    <script type="module" src="js/app.js"></script>
+    <script type="module" src="js/components/info-dialogs.js"></script>
+    <script type="module" src="js/components/backup.js"></script>
+    <link rel="stylesheet" href="css/saved-backgrounds.css" />
+    <script type="module" src="js/components/saved-backgrounds.js"></script>
+  </body>
+</html>
