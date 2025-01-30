@@ -1,9 +1,55 @@
 // Background Service Worker
-try {
-    importScripts('modules/state.js');
-} catch (error) {
-    console.error('Failed to import state module:', error);
-}
+const STATE_VERSION = '1.0.0';
+const STORAGE_KEY = 'daily_affirmations_settings';
+
+// State management within service worker
+const stateManager = {
+    currentSettings: null,
+    listeners: new Set(),
+
+    async loadState() {
+        try {
+            const result = await chrome.storage.sync.get(STORAGE_KEY);
+            this.currentSettings = result[STORAGE_KEY] || null;
+            return this.currentSettings;
+        } catch (error) {
+            console.error('Failed to load state in service worker:', error);
+            return null;
+        }
+    },
+
+    async updateSettings(updates) {
+        try {
+            const currentState = await this.loadState();
+            const newState = {
+                ...currentState,
+                ...updates
+            };
+            await chrome.storage.sync.set({ [STORAGE_KEY]: newState });
+            this.currentSettings = newState;
+            this.notifyListeners();
+            return true;
+        } catch (error) {
+            console.error('Failed to update settings in service worker:', error);
+            return false;
+        }
+    },
+
+    subscribe(listener) {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+    },
+
+    notifyListeners() {
+        this.listeners.forEach(listener => {
+            try {
+                listener(this.currentSettings);
+            } catch (error) {
+                console.error('Error in state change listener:', error);
+            }
+        });
+    }
+};
 
 // Initialize state manager
 let initialized = false;
@@ -26,7 +72,7 @@ async function initialize() {
             await setupDailyReminder(settings.reminderTime);
         }
         
-        // Listen for settings changes using the correct subscribe method
+        // Listen for settings changes
         stateManager.subscribe(handleSettingsChange);
         
         initialized = true;
@@ -107,7 +153,6 @@ if (chrome.action && chrome.action.onClicked) {
 // Handle messages from the main app
 self.addEventListener('message', (event) => {
     if (event.data.type === 'INIT') {
-        // Initialize with API keys
         console.log('Service Worker initialized with API keys');
     }
 });

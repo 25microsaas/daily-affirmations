@@ -17,6 +17,7 @@ class BackgroundService {
     constructor() {
         this.CACHE_KEY = 'background_data';
         this.CACHE_DURATION = 3600000; // 1 hour
+        this.BACKGROUND_REFRESH_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
         this.API_KEY = null;
         this.themes = {
             nature: 'nature,landscape,peaceful',
@@ -434,6 +435,19 @@ class BackgroundService {
     // Get random background
     async getRandomBackground() {
         try {
+            const settings = stateManager.getSettings();
+            const lastBackground = settings.lastBackground;
+            const lastBackgroundTime = settings.lastBackgroundTime;
+
+            // If we have a last background and it's within the refresh interval, use it
+            if (lastBackground && lastBackgroundTime) {
+                const timeSinceLastBackground = Date.now() - new Date(lastBackgroundTime).getTime();
+                if (timeSinceLastBackground < this.BACKGROUND_REFRESH_INTERVAL) {
+                    console.debug('Using existing background within refresh interval');
+                    return lastBackground;
+                }
+            }
+
             if (this.offlineMode) {
                 return this.getOfflineBackground();
             }
@@ -544,7 +558,8 @@ class BackgroundService {
                 await stateManager.updateSettings({
                     currentBackground: setAsFixed ? backgroundState : null,
                     backgroundMode: setAsFixed ? 'fixed' : 'random',
-                    lastBackground: backgroundState
+                    lastBackground: backgroundState,
+                    lastBackgroundTime: new Date().toISOString() // Add timestamp for background refresh tracking
                 });
             }
 
@@ -655,7 +670,7 @@ class BackgroundService {
         if (!saveButton) return;
 
         const settings = stateManager.getSettings();
-        const currentBackground = settings.currentBackground;
+        const currentBackground = settings.currentBackground || this.currentBackground;
 
         if (!currentBackground) {
             saveButton.disabled = false;
@@ -673,7 +688,7 @@ class BackgroundService {
     async toggleSaveBackground() {
         try {
             const settings = stateManager.getSettings();
-            const currentBackground = settings.currentBackground;
+            const currentBackground = settings.currentBackground || this.currentBackground;
 
             if (!currentBackground) {
                 throw new Error('No background to save');
@@ -688,11 +703,12 @@ class BackgroundService {
                 await stateManager.updateSettings({ customBackgrounds: updatedBackgrounds });
                 showNotification('Removed', 'Background removed from your collection');
             } else {
-                // Add to saved backgrounds
-                customBackgrounds.push({
+                // Add to saved backgrounds with timestamp
+                const backgroundToSave = {
                     ...currentBackground,
                     savedAt: new Date().toISOString()
-                });
+                };
+                customBackgrounds.push(backgroundToSave);
                 await stateManager.updateSettings({ customBackgrounds });
                 showNotification('Saved', 'Background added to your collection');
             }
