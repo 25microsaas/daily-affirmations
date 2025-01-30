@@ -75,7 +75,16 @@ class InfoDialogs {
                         <option value="bug">Bug Report</option>
                         <option value="other">Other</option>
                     </select>
-                    <input type="email" class="dialog-input" name="email" placeholder="Your email (optional)">
+                    <input 
+                        type="email" 
+                        class="dialog-input" 
+                        name="email" 
+                        id="feedbackEmail"
+                        autocomplete="email"
+                        spellcheck="false"
+                        aria-label="Email address for feedback"
+                        placeholder="Your email (optional)"
+                    >
                     <textarea class="dialog-input" name="message" rows="4" placeholder="Tell us what you think..." required></textarea>
                     <label class="checkbox-label">
                         <input type="checkbox" name="subscribe">

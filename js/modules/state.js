@@ -71,7 +71,7 @@ class StateManager {
         this.setupAutoBackup();
         
         // Debug log current settings
-        console.debug('StateManager initialized with settings:', this.currentSettings);
+        // console.debug('StateManager initialized with settings:', this.currentSettings);
     }
 
     // Type validators with improved error messages
@@ -162,22 +162,22 @@ class StateManager {
     // Load state with error recovery
     async loadState() {
         if (this.initialized) {
-            console.debug('State already initialized, returning current settings:', this.currentSettings);
+            // console.debug('State already initialized, returning current settings:', this.currentSettings);
             return this.currentSettings;
         }
 
         try {
-            console.debug('Loading state from storage...');
+            // console.debug('Loading state from storage...');
             
             // Try loading from chrome.storage.sync
             const syncData = await this.loadFromChromeStorage();
-            console.debug('Loaded from chrome.storage.sync:', syncData);
+            // console.debug('Loaded from chrome.storage.sync:', syncData);
             
             // If sync storage is empty or invalid, try local storage
             if (!syncData || !this.isStateValid(syncData)) {
-                console.debug('Sync storage empty or invalid, trying local storage...');
+                // console.debug('Sync storage empty or invalid, trying local storage...');
                 const localData = this.loadFromLocalStorage();
-                console.debug('Loaded from localStorage:', localData);
+                // console.debug('Loaded from localStorage:', localData);
 
                 if (localData && this.isStateValid(localData)) {
                     // If local storage has valid data, use it and sync back to chrome.storage
@@ -185,7 +185,7 @@ class StateManager {
                     this.currentSettings = localData;
                 } else {
                     // If both storages are empty/invalid, use default settings
-                    console.debug('Using default settings');
+                    // console.debug('Using default settings');
                     await this.saveState(defaultSettings);
                     this.currentSettings = { ...defaultSettings };
                 }
@@ -200,7 +200,7 @@ class StateManager {
             this.initialized = true;
             this.notifyListeners();
             
-            console.debug('Final state after loading:', this.currentSettings);
+            // console.debug('Final state after loading:', this.currentSettings);
             return this.currentSettings;
 
         } catch (error) {
@@ -253,7 +253,7 @@ class StateManager {
     // Save state with validation
     async saveState(state) {
         try {
-            console.debug('Saving state:', state);
+            // console.debug('Saving state:', state);
             
             const validatedState = this.validateState(state);
             
@@ -277,7 +277,7 @@ class StateManager {
             this.currentSettings = validatedState;
             this.notifyListeners();
             
-            console.debug('State saved successfully');
+            // console.debug('State saved successfully');
             return true;
         } catch (error) {
             console.error('Failed to save state:', error);
@@ -414,7 +414,7 @@ class StateManager {
     // Update specific settings
     async updateSettings(updates) {
         try {
-            console.debug('Updating settings with:', updates);
+            // console.debug('Updating settings with:', updates);
             
             const newState = {
                 ...this.currentSettings,
@@ -432,7 +432,7 @@ class StateManager {
     // Check if state is valid
     isStateValid(state) {
         if (!state || typeof state !== 'object') {
-            console.debug('State validation failed: state is not an object');
+            // console.debug('State validation failed: state is not an object');
             return false;
         }
         
@@ -448,7 +448,7 @@ class StateManager {
 
         const hasAllRequired = requiredFields.every(field => field in state);
         if (!hasAllRequired) {
-            console.debug('State validation failed: missing required fields');
+            // console.debug('State validation failed: missing required fields');
             return false;
         }
 
@@ -457,7 +457,7 @@ class StateManager {
             if (key in state) {
                 const { isValid, message } = validator(state[key]);
                 if (!isValid) {
-                    console.debug(`State validation failed: ${message}`);
+                    // console.debug(`State validation failed: ${message}`);
                     return false;
                 }
             }

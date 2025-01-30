@@ -106,7 +106,7 @@ async function getAsset(url) {
 self.addEventListener('install', event => {
     event.waitUntil(
         (async () => {
-            console.log('Caching app assets');
+            // console.log('Caching app assets');
             const db = await openDB();
             const baseUrl = self.registration.scope;
             
@@ -218,7 +218,7 @@ async function syncAffirmations() {
 // Initialize the service worker
 async function initialize() {
     try {
-        console.debug('Initializing service worker...');
+        // console.debug('Initializing service worker...');
         
         // Load settings first
         const settings = await stateManager.loadState();
@@ -234,7 +234,7 @@ async function initialize() {
         // Listen for settings changes
         stateManager.addListener(handleSettingsChange);
         
-        console.debug('Service worker initialized successfully');
+        // console.debug('Service worker initialized successfully');
     } catch (error) {
         console.error('Service worker initialization failed:', error);
     }
@@ -243,7 +243,7 @@ async function initialize() {
 // Handle settings changes
 async function handleSettingsChange(settings) {
     try {
-        console.debug('Settings changed:', settings);
+        // console.debug('Settings changed:', settings);
         
         // Update reminder if needed
         if (settings.reminderEnabled) {
@@ -281,7 +281,7 @@ async function setupDailyReminder(time) {
             periodInMinutes: 24 * 60 // Repeat daily
         });
         
-        console.debug('Daily reminder set for:', reminderTime);
+        // console.debug('Daily reminder set for:', reminderTime);
     } catch (error) {
         console.error('Failed to setup daily reminder:', error);
     }

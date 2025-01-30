@@ -78,10 +78,10 @@ export function setupAffirmationActions() {
 
                 case 'share':
                     if (affirmationText) {
-                        console.log('Sharing affirmation:', affirmationText);
+                        // console.log('Sharing affirmation:', affirmationText);
                         await requirePremium('share_affirmations', async () => {
                             try {
-                                console.log('Sharing affirmation DEEP:', affirmationText);
+                                // console.log('Sharing affirmation DEEP:', affirmationText);
                                 if (navigator.share) {
                                     await navigator.share({
                                         title: 'Daily Affirmation',

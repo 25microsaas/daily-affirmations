@@ -3,7 +3,7 @@
     "name": "Daily Affirmations",
     "short_name": "Affirmations",
     "version": "1.0.1",
-    "description": "Transform your new tab into a daily source of inspiration with personalized affirmations, beautiful backgrounds, and mindful reminders",
+    "description": "Transform your new tab with personalized affirmations and beautiful backgrounds for daily inspiration and mindful reminders",
     "icons": {
         "16": "images/icon-16.png",
         "32": "images/icon-32.png",
@@ -41,6 +41,9 @@
         "type": "module"
     },
     "offline_enabled": true,
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; connect-src 'self' https://*.unsplash.com https://api.unsplash.com https://api.openweathermap.org https://daily-affirmation.today https://www.daily-affirmation.today; img-src 'self' https://*.unsplash.com data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'self'"
+    },
     "web_accessible_resources": [{
         "resources": [
             "js/modules/*.js",
@@ -54,8 +57,5 @@
             "*.html"
         ],
         "matches": ["<all_urls>"]
-    }],
-    "content_security_policy": {
-        "extension_pages": "script-src 'self'; object-src 'self'; worker-src 'self'"
-    }
+    }]
 }

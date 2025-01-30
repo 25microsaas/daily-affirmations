@@ -47,10 +47,10 @@ class ReminderSettings {
                     </div>
 
                     <div class="reminder-days">
-                        <label>Repeat on</label>
-                        <div class="weekday-toggles">
+                        <label for="weekdayToggles">Repeat on</label>
+                        <div class="weekday-toggles" id="weekdayToggles">
                             ${this.weekdays.map(day => `
-                                <button class="weekday-btn" data-day="${day.id}">
+                                <button class="weekday-btn" data-day="${day.id}" aria-label="${day.label}">
                                     ${day.label}
                                 </button>
                             `).join('')}
@@ -58,16 +58,16 @@ class ReminderSettings {
                     </div>
 
                     <div class="reminder-times">
-                        <label>Reminder Times</label>
-                        <div class="time-list" id="timeList"></div>
-                        <button class="add-time-btn">
+                        <label for="reminderTimeList">Reminder Times</label>
+                        <div class="time-list" id="reminderTimeList"></div>
+                        <button class="add-time-btn" aria-label="Add new reminder time">
                             <span class="material-icons-round">add</span>
                             Add Time
                         </button>
                     </div>
 
                     <div class="reminder-message">
-                        <label>Custom Message</label>
+                        <label for="reminderMessage">Custom Message</label>
                         <input type="text" id="reminderMessage" 
                                placeholder="Time for your daily affirmation!"
                                maxlength="100">
@@ -373,7 +373,7 @@ class ReminderSettings {
             `;
             enableCheckbox.disabled = true;
             enableCheckbox.checked = false;
-            
+
             // Insert after the enable reminder toggle
             const reminderEnable = this.container.querySelector('.reminder-enable');
             reminderEnable.after(permissionMessage);
@@ -389,7 +389,7 @@ class ReminderSettings {
         });
 
         // Set times
-        const timeList = document.getElementById('timeList');
+        const timeList = document.getElementById('reminderTimeList');
         timeList.innerHTML = '';
         (reminder.times || ['09:00']).forEach(time => {
             this.addTimeInput(time);
@@ -431,7 +431,7 @@ class ReminderSettings {
     async testNotifications() {
         try {
             const permissionStatus = await this.checkNotificationPermission();
-            console.log('Notification Test Results:', permissionStatus);
+            // console.log('Notification Test Results:', permissionStatus);
 
             if (!permissionStatus.notificationAPI) {
                 showNotification('Error', 'Notifications are not supported in this browser');
@@ -470,7 +470,7 @@ class ReminderSettings {
     }
 
     addTimeInput(time = '') {
-        const timeList = document.getElementById('timeList');
+        const timeList = document.getElementById('reminderTimeList');
         const timeItem = document.createElement('div');
         timeItem.className = 'time-item';
         timeItem.innerHTML = `

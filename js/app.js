@@ -203,14 +203,14 @@ class App {
         if (this.initialized) return;
 
         try {
-            console.debug('Initializing app...');
+            // console.debug('Initializing app...');
             
             // First, ensure settings are loaded
             const settings = await stateManager.loadState();
             if (!settings) {
                 throw new Error('Failed to load settings');
             }
-            console.debug('Initial settings loaded:', settings);
+            // console.debug('Initial settings loaded:', settings);
 
             // Initialize services
             await this.initializeServices();
@@ -222,7 +222,7 @@ class App {
             await this.initializeUI();
             
             this.initialized = true;
-            console.debug('App initialization complete');
+            // console.debug('App initialization complete');
         } catch (error) {
             console.error('App initialization failed:', error);
             this.handleInitializationError(error);
@@ -232,7 +232,7 @@ class App {
     // Apply initial settings on app load
     applyInitialSettings(settings) {
         try {
-            console.debug('Applying initial settings:', settings);
+            // console.debug('Applying initial settings:', settings);
             
             // Apply theme settings
             this.applyThemeSettings(settings);
@@ -266,12 +266,12 @@ class App {
             if (controls.fontStyle) controls.fontStyle.value = settings.fontStyle;
             if (controls.textColor) controls.textColor.value = settings.textColor;
 
-            console.debug('Initial settings applied successfully');
+            // console.debug('Initial settings applied successfully');
         } catch (error) {
             console.error('Failed to apply initial settings:', error);
             // Continue with default settings
             const defaultSettings = stateManager.getSettings();
-            console.debug('Falling back to default settings:', defaultSettings);
+            // console.debug('Falling back to default settings:', defaultSettings);
             this.applyThemeSettings(defaultSettings);
         }
     }

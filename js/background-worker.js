@@ -59,7 +59,7 @@ async function initialize() {
     if (initialized) return;
 
     try {
-        console.debug('Initializing background service worker...');
+        // console.debug('Initializing background service worker...');
         
         // Load settings first
         const settings = await stateManager.loadState();
@@ -76,7 +76,7 @@ async function initialize() {
         stateManager.subscribe(handleSettingsChange);
         
         initialized = true;
-        console.debug('Background service worker initialized successfully');
+        // console.debug('Background service worker initialized successfully');
     } catch (error) {
         console.error('Background service worker initialization failed:', error);
     }
@@ -85,7 +85,7 @@ async function initialize() {
 // Handle settings changes
 async function handleSettingsChange(settings) {
     try {
-        console.debug('Settings changed in background worker:', settings);
+        // console.debug('Settings changed in background worker:', settings);
         
         // Update reminder if needed
         if (settings.reminderEnabled) {
@@ -123,25 +123,29 @@ async function setupDailyReminder(time) {
             periodInMinutes: 24 * 60 // Repeat daily
         });
         
-        console.debug('Daily reminder set for:', reminderTime);
+        // console.debug('Daily reminder set for:', reminderTime);
     } catch (error) {
         console.error('Failed to setup daily reminder:', error);
     }
 }
 
 // Initialize on install
-chrome.runtime.onInstalled.addListener(() => {
-    initialize().catch(error => {
-        console.error('Failed to initialize on install:', error);
+if (chrome.runtime && chrome.runtime.onInstalled) {
+    chrome.runtime.onInstalled.addListener(() => {
+        initialize().catch(error => {
+            console.error('Failed to initialize on install:', error);
+        });
     });
-});
+}
 
 // Initialize on startup
-chrome.runtime.onStartup.addListener(() => {
-    initialize().catch(error => {
-        console.error('Failed to initialize on startup:', error);
+if (chrome.runtime && chrome.runtime.onStartup) {
+    chrome.runtime.onStartup.addListener(() => {
+        initialize().catch(error => {
+            console.error('Failed to initialize on startup:', error);
+        });
     });
-});
+}
 
 // Handle extension icon click
 if (chrome.action && chrome.action.onClicked) {
@@ -153,7 +157,7 @@ if (chrome.action && chrome.action.onClicked) {
 // Handle messages from the main app
 self.addEventListener('message', (event) => {
     if (event.data.type === 'INIT') {
-        console.log('Service Worker initialized with API keys');
+        // console.log('Service Worker initialized with API keys');
     }
 });
 

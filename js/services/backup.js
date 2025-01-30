@@ -24,14 +24,14 @@ class BackupService {
             // Check if cloud sync is enabled
             const settings = await stateManager.loadState();
             if (!settings.cloudSyncEnabled) {
-                console.debug('Cloud sync is disabled');
+                // console.debug('Cloud sync is disabled');
                 return;
             }
 
             // Check authentication status
             const isAuthenticated = await this.checkAuthStatus();
             if (!isAuthenticated) {
-                console.debug('User not authenticated for cloud sync');
+                // console.debug('User not authenticated for cloud sync');
                 return;
             }
 

@@ -478,6 +478,8 @@ body.focus-mode .fullscreen-container {
     text-align: center;
     color: var(--widget-text-color);
     transition: var(--transition-default);
+    width: 90%;
+    max-width: 600px;
 }
 
 .affirmation-card:hover {
@@ -491,6 +493,28 @@ body.focus-mode .fullscreen-container {
     font-weight: 400;
     letter-spacing: -0.01em;
     color: var(--widget-text-color);
+}
+
+/* For wider screens, allow fit-content */
+@media screen and (min-width: 1200px) {
+    .affirmation-card {
+        width: auto;
+        max-width: fit-content;
+        padding: 2rem 3rem;
+    }
+
+    .affirmation-text {
+        max-width: 800px;
+        white-space: normal;
+        text-align: center;
+    }
+}
+
+/* Ensure text remains readable on very wide screens */
+@media screen and (min-width: 1600px) {
+    .affirmation-card {
+        max-width: 1000px;
+    }
 }
 
 /* Main Affirmation Card Menu */
@@ -2591,4 +2615,118 @@ body[style*="--user-text-color"] {
 .permission-note {
     font-size: 0.875rem;
     opacity: 0.8;
+}
+
+/* Focus mode modifications */
+body.focus-mode .affirmation-menu-button,
+body.focus-mode .affirmation-actions {
+    display: none !important;
+}
+
+body.focus-mode .affirmation-card:hover .affirmation-actions,
+body.focus-mode .affirmation-card:hover .affirmation-menu-button {
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.focus-mode .affirmation-card {
+    cursor: default;
+}
+
+/* Weather City Search */
+.weather-search {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--glass-bg-dark);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-md);
+    transform: translateY(-8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    z-index: 100;
+}
+
+.weather-search.show {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.weather-search-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+
+.weather-search-input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    color: var(--widget-text-color);
+    font-size: 0.9375rem;
+}
+
+.weather-search-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.weather-search-close {
+    background: none;
+    border: none;
+    color: var(--widget-text-color);
+    padding: 4px;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.weather-search-close:hover {
+    opacity: 1;
+}
+
+.weather-search-results {
+    flex: 1;
+    overflow-y: auto;
+    margin-top: var(--space-sm);
+}
+
+.weather-search-message {
+    text-align: center;
+    color: var(--widget-text-secondary);
+    font-size: 0.875rem;
+    margin-top: var(--space-md);
+}
+
+.weather-location-button {
+    background: none;
+    border: none;
+    color: var(--widget-text-color);
+    padding: 8px;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.weather-location-button:hover {
+    opacity: 1;
+    transform: translateX(4px);
+}
+
+.weather-location-button i {
+    font-size: 20px;
 }

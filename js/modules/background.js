@@ -85,7 +85,7 @@ class BackgroundService {
         if ('serviceWorker' in navigator) {
             try {
                 const registration = await navigator.serviceWorker.register('/js/background-worker.js');
-                console.log('ServiceWorker registered:', registration);
+                // console.log('ServiceWorker registered:', registration);
 
                 // Send API key to service worker when it's active
                 if (registration.active && this.API_KEY) {
@@ -104,7 +104,7 @@ class BackgroundService {
     // Initialize API key
     async init(apiKey) {
         if (this.initialized) {
-            console.debug('Background service already initialized');
+            // console.debug('Background service already initialized');
             return true;
         }
 
@@ -132,59 +132,49 @@ class BackgroundService {
     // Fetch background from Unsplash
     async fetchBackground() {
         try {
-            if (!this.API_KEY) {
-                throw new BackgroundError('API key not initialized', 'API_KEY_MISSING');
-            }
-
             const query = this.getBackgroundQuery();
-            const endpoint = `https://api.unsplash.com/photos/random?query=${query}&orientation=landscape&content_filter=high`;
-
-            const response = await fetch(endpoint, {
+            const response = await fetch(`https://api.unsplash.com/photos/random?query=${query}&orientation=landscape`, {
                 headers: {
                     'Authorization': `Client-ID ${this.API_KEY}`,
+                    'Accept-Version': 'v1',
                     'Accept': 'application/json',
-                    'Sec-Fetch-Site': 'cross-site',
-                    'Sec-Fetch-Mode': 'cors'
                 },
-                credentials: 'same-origin', // Don't send cookies for cross-origin requests
-                mode: 'cors'
+                credentials: 'omit', // Don't send cookies
+                mode: 'cors',
+                cache: 'no-store'
             });
 
             if (!response.ok) {
-                throw new BackgroundError(
-                    'Unsplash API error',
-                    'API_ERROR',
-                    { status: response.status }
-                );
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
-
-            // Process image URL to avoid cookie issues
+            
+            // Process image URL to prevent cookie issues
             const imageUrl = new URL(data.urls.regular);
             imageUrl.searchParams.set('w', '1920');
             imageUrl.searchParams.set('auto', 'format');
+            imageUrl.searchParams.set('no_cookie', '1');
             imageUrl.searchParams.set('fit', 'max');
             imageUrl.searchParams.set('q', '80');
+            imageUrl.searchParams.set('cs', 'tinysrgb');
+            imageUrl.searchParams.set('crop', 'entropy');
 
             // Cache the processed data
-            await this.cacheData({
+            const processedData = {
                 ...data,
                 urls: {
                     ...data.urls,
                     regular: imageUrl.toString()
                 },
                 theme: stateManager.getSettings().backgroundTheme
-            });
+            };
 
-            return data;
+            await this.cacheData(processedData);
+            return processedData;
         } catch (error) {
-            if (error instanceof BackgroundError) throw error;
-            throw new BackgroundError(
-                'Failed to fetch background',
-                'FETCH_ERROR',
-                { originalError: error }
-            );
+            console.error('Failed to fetch background:', error);
+            throw error;
         }
     }
 
@@ -229,8 +219,26 @@ class BackgroundService {
             const img = new Image();
             img.crossOrigin = 'anonymous';
             img.referrerPolicy = 'no-referrer';
+            
+            try {
+                // Process URL to prevent cookie issues
+                const imageUrl = new URL(url);
+                if (imageUrl.hostname.includes('unsplash.com')) {
+                    imageUrl.searchParams.set('w', '1920');
+                    imageUrl.searchParams.set('auto', 'format');
+                    imageUrl.searchParams.set('no_cookie', '1');
+                    imageUrl.searchParams.set('fit', 'max');
+                    imageUrl.searchParams.set('q', '80');
+                    imageUrl.searchParams.set('cs', 'tinysrgb');
+                    imageUrl.searchParams.set('crop', 'entropy');
+                    url = imageUrl.toString();
+                }
+            } catch (e) {
+                // console.debug('URL processing skipped for non-Unsplash image');
+            }
+            
             img.onload = () => resolve(img);
-            img.onerror = () => reject(new BackgroundError('Failed to load image', 'IMAGE_LOAD_ERROR'));
+            img.onerror = () => reject(new Error('Failed to load image'));
             img.src = url;
         });
     }
@@ -246,39 +254,80 @@ class BackgroundService {
         }
 
         try {
-            // Construct URL with no-cookie parameter and optimization settings
-            const imageUrl = new URL(data.urls.regular);
-            imageUrl.searchParams.set('w', '1920');
-            imageUrl.searchParams.set('auto', 'format');
-            imageUrl.searchParams.set('no_cookie', '1');
+            if (!data) {
+                throw new BackgroundError('No background data provided', 'DATA_MISSING');
+            }
+
+            // Validate and get the image URL
+            let imageUrl;
+            try {
+                // Handle both direct Unsplash response and our stored background format
+                const urlString = data.urls?.regular || data.url;
+                if (!urlString) {
+                    throw new BackgroundError('No valid URL found in background data', 'URL_MISSING');
+                }
+
+                // Check if it's a relative path to a default background
+                if (urlString.startsWith('../images/') || urlString.startsWith('images/')) {
+                    imageUrl = new URL(chrome.runtime.getURL(urlString.replace('../', '')));
+                } else {
+                    imageUrl = new URL(urlString);
+                }
+            } catch (urlError) {
+                console.error('Invalid URL in background data:', urlError);
+                // Fallback to default background
+                const defaultBg = this.defaultBackgrounds[0];
+                imageUrl = new URL(chrome.runtime.getURL(defaultBg.url.replace('../', '')));
+                data = defaultBg;
+            }
+
+            const credit = data.user ? `Photo by ${data.user.name} on Unsplash` : data.credit || 'Unknown';
+            const location = data.location?.name || data.location?.city || data.location?.country || data.location || '';
+            const photographerName = data.user?.name || credit.replace('Photo by ', '').replace(' on Unsplash', '');
+            const photographerUrl = data.user?.links?.html || '#';
+
+            // Add optimization parameters for Unsplash URLs
+            if (imageUrl.hostname.includes('unsplash.com')) {
+                imageUrl.searchParams.set('w', '1920');
+                imageUrl.searchParams.set('auto', 'format');
+                imageUrl.searchParams.set('no_cookie', '1');
+                imageUrl.searchParams.set('fit', 'max');
+                imageUrl.searchParams.set('q', '80');
+            }
 
             // Preload image before displaying
             await this.preloadImage(imageUrl.toString());
 
             overlay.style.backgroundImage = `url(${imageUrl.toString()})`;
-            creditLink.href = `${data.user.links.html}?utm_source=daily_affirmations&utm_medium=referral`;
-            creditLink.textContent = data.user.name;
-
-            const location = data.location?.name || data.location?.city || data.location?.country;
+            creditLink.href = photographerUrl === '#' ? '#' : `${photographerUrl}?utm_source=daily_affirmations&utm_medium=referral`;
+            creditLink.textContent = photographerName;
             locationElement.textContent = location ? `📍 ${location}` : '';
 
             // Save current background in settings
+            const backgroundData = {
+                id: data.id || `default_${Date.now()}`,
+                url: imageUrl.toString(),
+                credit: credit,
+                location: location || null,
+                addedAt: data.addedAt || new Date().toISOString()
+            };
+
+            // Save current background in settings
             await stateManager.updateSettings({
-                currentBackground: {
-                    id: data.id,
-                    url: imageUrl.toString(),
-                    credit: `Photo by ${data.user.name} on Unsplash`,
-                    location: location || null,
-                    addedAt: new Date().toISOString()
-                }
+                currentBackground: backgroundData,
+                lastBackground: backgroundData,
+                lastBackgroundTime: new Date().toISOString()
             });
 
             // Update save button state
             await this.updateSaveButtonState();
 
+            return backgroundData;
+
         } catch (error) {
             console.error('Failed to update background display:', error);
             this.handleError();
+            throw error;
         }
     }
 
@@ -374,6 +423,13 @@ class BackgroundService {
     // Main update function
     async update() {
         try {
+            // Check if we're in fixed mode first
+            const settings = stateManager.getSettings();
+            if (settings.backgroundMode === 'fixed' && settings.currentBackground) {
+                await this.updateDisplay(settings.currentBackground);
+                return;
+            }
+
             // Try to load cached data first
             const cached = await this.loadCachedData();
             if (cached) {
@@ -388,17 +444,33 @@ class BackgroundService {
         } catch (error) {
             console.error('Background update failed:', error);
             this.handleError();
+            throw error;
         }
     }
 
-    // Load and cache image
+    // Load and cache image with no-cookie settings
     async loadImage(url) {
         try {
-            // Try loading online image first
+            // Process URL to prevent cookie issues
+            if (url.includes('unsplash.com')) {
+                const imageUrl = new URL(url);
+                imageUrl.searchParams.set('w', '1920');
+                imageUrl.searchParams.set('auto', 'format');
+                imageUrl.searchParams.set('no_cookie', '1');
+                imageUrl.searchParams.set('fit', 'max');
+                imageUrl.searchParams.set('q', '80');
+                imageUrl.searchParams.set('cs', 'tinysrgb');
+                imageUrl.searchParams.set('crop', 'entropy');
+                url = imageUrl.toString();
+            }
+
             const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.referrerPolicy = 'no-referrer';
+
             const loadPromise = new Promise((resolve, reject) => {
                 img.onload = () => resolve(img);
-                img.onerror = () => reject(new BackgroundError('Failed to load image'));
+                img.onerror = () => reject(new Error('Failed to load image'));
             });
 
             img.src = url;
@@ -406,30 +478,34 @@ class BackgroundService {
             try {
                 return await loadPromise;
             } catch (error) {
-                // If online image fails, try loading fallback
-                console.log('Failed to load online image, trying fallback...');
-                const fallbackImages = [
-                    'images/backgrounds/default-1.jpeg',
-                    'images/backgrounds/default-2.jpeg',
-                    'images/backgrounds/default-3.jpeg',
-                    'images/backgrounds/default-4.jpeg',
-                    'images/backgrounds/default-5.jpeg'
-                ];
-
-                const fallbackImg = new Image();
-                const fallbackPromise = new Promise((resolve, reject) => {
-                    fallbackImg.onload = () => resolve(fallbackImg);
-                    fallbackImg.onerror = () => reject(new BackgroundError('Failed to load fallback image'));
-                });
-
-                const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
-                fallbackImg.src = chrome.runtime.getURL(randomFallback);
-
-                return await fallbackPromise;
+                // console.log('Failed to load online image, trying fallback...');
+                return this.loadDefaultBackground();
             }
         } catch (error) {
-            throw new BackgroundError('Failed to load any image');
+            throw new Error('Failed to load any image');
         }
+    }
+
+    // Helper method for loading default background
+    async loadDefaultBackground() {
+        const fallbackImages = [
+            'images/backgrounds/default-1.jpeg',
+            'images/backgrounds/default-2.jpeg',
+            'images/backgrounds/default-3.jpeg',
+            'images/backgrounds/default-4.jpeg',
+            'images/backgrounds/default-5.jpeg'
+        ];
+
+        const fallbackImg = new Image();
+        const fallbackPromise = new Promise((resolve, reject) => {
+            fallbackImg.onload = () => resolve(fallbackImg);
+            fallbackImg.onerror = () => reject(new Error('Failed to load fallback image'));
+        });
+
+        const randomFallback = fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
+        fallbackImg.src = chrome.runtime.getURL(randomFallback);
+
+        return fallbackPromise;
     }
 
     // Get random background
@@ -443,7 +519,7 @@ class BackgroundService {
             if (lastBackground && lastBackgroundTime) {
                 const timeSinceLastBackground = Date.now() - new Date(lastBackgroundTime).getTime();
                 if (timeSinceLastBackground < this.BACKGROUND_REFRESH_INTERVAL) {
-                    console.debug('Using existing background within refresh interval');
+                    // console.debug('Using existing background within refresh interval');
                     return lastBackground;
                 }
             }
@@ -507,7 +583,7 @@ class BackgroundService {
     async updateBackgroundDisplay(background, setAsFixed = true) {
         // Skip if not initialized yet
         if (!this.initialized && !setAsFixed) {
-            console.debug('Skipping update - not initialized yet');
+            // console.debug('Skipping update - not initialized yet');
             return background;
         }
 
@@ -523,7 +599,7 @@ class BackgroundService {
             // Check if we should update when in fixed mode
             const settings = stateManager.getSettings();
             if (settings.backgroundMode === 'fixed' && settings.currentBackground && !setAsFixed) {
-                console.debug('Skipping update - fixed background mode active');
+                // console.debug('Skipping update - fixed background mode active');
                 return settings.currentBackground;
             }
 
@@ -599,13 +675,13 @@ class BackgroundService {
     async refreshBackground() {
         try {
             const settings = stateManager.getSettings();
-            console.debug('Refreshing background with settings:', settings);
+            // console.debug('Refreshing background with settings:', settings);
 
             if (settings.backgroundMode === 'fixed' && settings.currentBackground) {
-                console.debug('Keeping fixed background:', settings.currentBackground);
+                // console.debug('Keeping fixed background:', settings.currentBackground);
                 return settings.currentBackground;
             } else {
-                console.debug('Getting new random background');
+                // console.debug('Getting new random background');
                 const background = await this.getRandomBackground();
                 return this.updateBackgroundDisplay(background, false);
             }
@@ -618,7 +694,7 @@ class BackgroundService {
     // Initialize background service with mode handling
     async initialize() {
         if (this.initialized) {
-            console.debug('Background service already initialized');
+            // console.debug('Background service already initialized');
             return;
         }
 
@@ -633,24 +709,24 @@ class BackgroundService {
 
             // Get current settings
             const settings = stateManager.getSettings();
-            console.debug('Current settings on init:', settings);
+            // console.debug('Current settings on init:', settings);
 
             // Set initialized flag before updating display
             this.initialized = true;
 
             if (settings.backgroundMode === 'fixed' && settings.currentBackground) {
                 // Restore fixed background
-                console.debug('Restoring fixed background:', settings.currentBackground);
+                // console.debug('Restoring fixed background:', settings.currentBackground);
                 this.currentBackground = settings.currentBackground;
                 await this.updateBackgroundDisplay(settings.currentBackground, true);
             } else {
                 // Start in random mode
-                console.debug('Starting in random mode');
+                // console.debug('Starting in random mode');
                 const background = await this.getRandomBackground();
                 await this.updateBackgroundDisplay(background, false);
             }
 
-            console.debug('Background service initialized with mode:', settings.backgroundMode);
+            // console.debug('Background service initialized with mode:', settings.backgroundMode);
         } catch (error) {
             console.error('Failed to initialize background service:', error);
             // Fallback to first default background in random mode

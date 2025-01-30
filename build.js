@@ -14,7 +14,7 @@ configContent = configContent.replace('__EXTENSION_KEY__', extensionKey);
 // Write back the modified file
 fs.writeFileSync(configPath, configContent);
 
-console.log('Extension key injected successfully');
+// console.log('Extension key injected successfully');
 
 // Helper function to generate a secure key
 function generateSecureKey() {

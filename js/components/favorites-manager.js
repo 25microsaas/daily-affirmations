@@ -119,7 +119,7 @@ class FavoritesManager {
         listContainer.innerHTML = favorites.map(favorite => `
             <div class="favorite-item glass">
                 <div class="favorite-content">
-                    <p class="x">${favorite.text}</p>
+                    <p class="favorite-text">${favorite.text}</p>
                     <div class="favorite-metadata">
                         <div class="metadata-group">
                             <span class="favorite-date">
