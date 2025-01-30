@@ -23,7 +23,7 @@ class FavoritesManager {
                         <i class="material-icons-round header-icon">favorite</i>
                         <h2>Favorites</h2>
                     </div>
-                    <button class="close-button glass-button" aria-label="Close dialog">
+                    <button class="close-button" aria-label="Close dialog">
                         <i class="material-icons-round">close</i>
                     </button>
                 </div>
@@ -119,7 +119,7 @@ class FavoritesManager {
         listContainer.innerHTML = favorites.map(favorite => `
             <div class="favorite-item glass">
                 <div class="favorite-content">
-                    <p class="favorite-text">${favorite.text}</p>
+                    <p class="x">${favorite.text}</p>
                     <div class="favorite-metadata">
                         <div class="metadata-group">
                             <span class="favorite-date">

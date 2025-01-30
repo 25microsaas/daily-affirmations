@@ -88,7 +88,7 @@ class WeatherService {
                     { status: response.status }
                 );
             }
-            
+
             const data = await response.json();
             await this.cacheData(data);
             return data;

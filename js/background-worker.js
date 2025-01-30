@@ -1,28 +1,108 @@
 // Background Service Worker
-self.addEventListener('install', (event) => {
-    console.log('Service Worker installing.');
-    self.skipWaiting();
+try {
+    importScripts('modules/state.js');
+} catch (error) {
+    console.error('Failed to import state module:', error);
+}
+
+// Initialize state manager
+let initialized = false;
+
+// Initialize the service worker
+async function initialize() {
+    if (initialized) return;
+
+    try {
+        console.debug('Initializing background service worker...');
+        
+        // Load settings first
+        const settings = await stateManager.loadState();
+        if (!settings) {
+            throw new Error('Failed to load settings');
+        }
+        
+        // Setup alarm if reminders are enabled
+        if (settings.reminderEnabled) {
+            await setupDailyReminder(settings.reminderTime);
+        }
+        
+        // Listen for settings changes using the correct subscribe method
+        stateManager.subscribe(handleSettingsChange);
+        
+        initialized = true;
+        console.debug('Background service worker initialized successfully');
+    } catch (error) {
+        console.error('Background service worker initialization failed:', error);
+    }
+}
+
+// Handle settings changes
+async function handleSettingsChange(settings) {
+    try {
+        console.debug('Settings changed in background worker:', settings);
+        
+        // Update reminder if needed
+        if (settings.reminderEnabled) {
+            await setupDailyReminder(settings.reminderTime);
+        } else {
+            await chrome.alarms.clear('dailyReminder');
+        }
+    } catch (error) {
+        console.error('Failed to handle settings change in background:', error);
+    }
+}
+
+// Setup daily reminder
+async function setupDailyReminder(time) {
+    try {
+        // Clear existing alarm
+        await chrome.alarms.clear('dailyReminder');
+        
+        // Parse time string
+        const [hours, minutes] = time.split(':').map(Number);
+        
+        // Calculate when the alarm should next fire
+        const now = new Date();
+        let reminderTime = new Date(now);
+        reminderTime.setHours(hours, minutes, 0, 0);
+        
+        // If the time has already passed today, set it for tomorrow
+        if (reminderTime < now) {
+            reminderTime.setDate(reminderTime.getDate() + 1);
+        }
+        
+        // Create the alarm
+        await chrome.alarms.create('dailyReminder', {
+            when: reminderTime.getTime(),
+            periodInMinutes: 24 * 60 // Repeat daily
+        });
+        
+        console.debug('Daily reminder set for:', reminderTime);
+    } catch (error) {
+        console.error('Failed to setup daily reminder:', error);
+    }
+}
+
+// Initialize on install
+chrome.runtime.onInstalled.addListener(() => {
+    initialize().catch(error => {
+        console.error('Failed to initialize on install:', error);
+    });
 });
 
-self.addEventListener('activate', (event) => {
-    console.log('Service Worker activated.');
-    event.waitUntil(clients.claim());
+// Initialize on startup
+chrome.runtime.onStartup.addListener(() => {
+    initialize().catch(error => {
+        console.error('Failed to initialize on startup:', error);
+    });
 });
 
 // Handle extension icon click
-chrome.action.onClicked.addListener(async () => {
-    // Check for existing tabs with our extension
-    const tabs = await chrome.tabs.query({url: 'chrome://newtab/'});
-    
-    if (tabs.length > 0) {
-        // If a new tab with our extension exists, focus it
-        await chrome.tabs.update(tabs[0].id, {active: true});
-        await chrome.windows.update(tabs[0].windowId, {focused: true});
-    } else {
-        // Create a new tab only if none exists
-        chrome.tabs.create({url: 'chrome://newtab/'});
-    }
-});
+if (chrome.action && chrome.action.onClicked) {
+    chrome.action.onClicked.addListener(() => {
+        chrome.tabs.create({});  // Will automatically use newtab.html due to chrome_url_overrides
+    });
+}
 
 // Handle messages from the main app
 self.addEventListener('message', (event) => {

@@ -1,5 +1,9 @@
 // Service Worker for offline support
-const CACHE_NAME = 'daily-affirmations-v1';
+importScripts('/js/modules/state.js');
+
+const CACHE_VERSION = 'v1';
+const DB_NAME = 'DailyAffirmationsDB';
+const ASSETS_STORE = 'assets';
 const OFFLINE_URL = 'offline.html';
 
 const ASSETS_TO_CACHE = [
@@ -43,50 +47,99 @@ const ASSETS_TO_CACHE = [
     '/css/shepherd.css'
 ];
 
+// Initialize state manager
+const stateManager = new StateManager();
+
+// Open IndexedDB
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        
+        request.onupgradeneeded = event => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(ASSETS_STORE)) {
+                db.createObjectStore(ASSETS_STORE, { keyPath: 'url' });
+            }
+            if (!db.objectStoreNames.contains('unsynced')) {
+                db.createObjectStore('unsynced', { keyPath: 'id' });
+            }
+        };
+    });
+}
+
+// Store asset in IndexedDB
+async function storeAsset(url, response) {
+    const db = await openDB();
+    const tx = db.transaction(ASSETS_STORE, 'readwrite');
+    const store = tx.objectStore(ASSETS_STORE);
+    
+    const blob = await response.blob();
+    await store.put({
+        url,
+        blob,
+        timestamp: Date.now()
+    });
+    
+    return tx.complete;
+}
+
+// Get asset from IndexedDB
+async function getAsset(url) {
+    const db = await openDB();
+    const tx = db.transaction(ASSETS_STORE, 'readonly');
+    const store = tx.objectStore(ASSETS_STORE);
+    const asset = await store.get(url);
+    
+    if (!asset) return null;
+    
+    return new Response(asset.blob, {
+        headers: {
+            'Content-Type': asset.blob.type
+        }
+    });
+}
+
 // Install event - cache assets
 self.addEventListener('install', event => {
     event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then(cache => {
-                console.log('Caching app assets');
-                // Convert relative URLs to absolute chrome-extension:// URLs
-                const baseUrl = self.registration.scope;
-                const urlsToCache = ASSETS_TO_CACHE.map(url => new URL(url, baseUrl).href);
-                return Promise.all(
-                    urlsToCache.map(url =>
-                        fetch(url)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`Failed to fetch ${url}`);
-                                }
-                                return cache.put(url, response);
-                            })
-                            .catch(error => {
-                                console.warn(`Failed to cache ${url}:`, error);
-                            })
-                    )
-                );
-            })
-            .then(() => self.skipWaiting())
+        (async () => {
+            console.log('Caching app assets');
+            const db = await openDB();
+            const baseUrl = self.registration.scope;
+            
+            // Cache each asset
+            for (const assetPath of ASSETS_TO_CACHE) {
+                const url = new URL(assetPath, baseUrl).href;
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch ${url}`);
+                    }
+                    await storeAsset(url, response.clone());
+                } catch (error) {
+                    console.warn(`Failed to cache ${url}:`, error);
+                }
+            }
+            
+            await self.skipWaiting();
+        })()
     );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old data
 self.addEventListener('activate', event => {
     event.waitUntil(
-        caches.keys()
-            .then(cacheNames => {
-                return Promise.all(
-                    cacheNames
-                        .filter(name => name !== CACHE_NAME)
-                        .map(name => caches.delete(name))
-                );
-            })
-            .then(() => self.clients.claim())
+        (async () => {
+            // Here we could clean up old versions if needed
+            await self.clients.claim();
+        })()
     );
 });
 
-// Fetch event - serve from cache or network
+// Fetch event - serve from IndexedDB or network
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
     
@@ -96,41 +149,37 @@ self.addEventListener('fetch', event => {
     }
 
     event.respondWith(
-        caches.match(event.request)
-            .then(response => {
-                if (response) {
+        (async () => {
+            try {
+                // Try to get from IndexedDB first
+                const cachedResponse = await getAsset(url.href);
+                if (cachedResponse) {
+                    return cachedResponse;
+                }
+
+                // If not in IndexedDB, fetch from network
+                const response = await fetch(event.request);
+                if (!response || response.status !== 200) {
                     return response;
                 }
 
-                return fetch(event.request)
-                    .then(response => {
-                        // Don't cache non-successful responses
-                        if (!response || response.status !== 200) {
-                            return response;
-                        }
-
-                        // Clone the response
-                        const responseToCache = response.clone();
-
-                        // Cache the fetched response
-                        caches.open(CACHE_NAME)
-                            .then(cache => {
-                                cache.put(event.request, responseToCache);
-                            });
-
-                        return response;
-                    })
-                    .catch(error => {
-                        console.error('Fetch failed:', error);
-                        
-                        // If offline and requesting the main page
-                        if (event.request.mode === 'navigate') {
-                            return caches.match(OFFLINE_URL);
-                        }
-
-                        return null;
-                    });
-            })
+                // Store in IndexedDB for next time
+                await storeAsset(url.href, response.clone());
+                return response;
+            } catch (error) {
+                console.error('Fetch failed:', error);
+                
+                // If offline and requesting the main page
+                if (event.request.mode === 'navigate') {
+                    const offlineResponse = await getAsset(new URL(OFFLINE_URL, self.registration.scope).href);
+                    if (offlineResponse) {
+                        return offlineResponse;
+                    }
+                }
+                
+                throw error;
+            }
+        })()
     );
 });
 
@@ -144,7 +193,9 @@ self.addEventListener('sync', event => {
 // Sync affirmations when online
 async function syncAffirmations() {
     const db = await openDB();
-    const unsynced = await db.getAll('unsynced');
+    const tx = db.transaction('unsynced', 'readonly');
+    const store = tx.objectStore('unsynced');
+    const unsynced = await store.getAll();
     
     for (const item of unsynced) {
         try {
@@ -155,26 +206,131 @@ async function syncAffirmations() {
             });
             
             // Remove from unsynced if successful
-            await db.delete('unsynced', item.id);
+            const deleteTx = db.transaction('unsynced', 'readwrite');
+            await deleteTx.objectStore('unsynced').delete(item.id);
+            await deleteTx.complete;
         } catch (error) {
             console.error('Sync failed:', error);
         }
     }
 }
 
-// Open IndexedDB
-function openDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('AffirmationsDB', 1);
+// Initialize the service worker
+async function initialize() {
+    try {
+        console.debug('Initializing service worker...');
         
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
+        // Load settings first
+        const settings = await stateManager.loadState();
+        if (!settings) {
+            throw new Error('Failed to load settings');
+        }
         
-        request.onupgradeneeded = event => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains('unsynced')) {
-                db.createObjectStore('unsynced', { keyPath: 'id' });
+        // Setup alarm if reminders are enabled
+        if (settings.reminderEnabled) {
+            await setupDailyReminder(settings.reminderTime);
+        }
+        
+        // Listen for settings changes
+        stateManager.addListener(handleSettingsChange);
+        
+        console.debug('Service worker initialized successfully');
+    } catch (error) {
+        console.error('Service worker initialization failed:', error);
+    }
+}
+
+// Handle settings changes
+async function handleSettingsChange(settings) {
+    try {
+        console.debug('Settings changed:', settings);
+        
+        // Update reminder if needed
+        if (settings.reminderEnabled) {
+            await setupDailyReminder(settings.reminderTime);
+        } else {
+            await chrome.alarms.clear('dailyReminder');
+        }
+    } catch (error) {
+        console.error('Failed to handle settings change:', error);
+    }
+}
+
+// Setup daily reminder
+async function setupDailyReminder(time) {
+    try {
+        // Clear existing alarm
+        await chrome.alarms.clear('dailyReminder');
+        
+        // Parse time string
+        const [hours, minutes] = time.split(':').map(Number);
+        
+        // Calculate when the alarm should next fire
+        const now = new Date();
+        let reminderTime = new Date(now);
+        reminderTime.setHours(hours, minutes, 0, 0);
+        
+        // If the time has already passed today, set it for tomorrow
+        if (reminderTime < now) {
+            reminderTime.setDate(reminderTime.getDate() + 1);
+        }
+        
+        // Create the alarm
+        await chrome.alarms.create('dailyReminder', {
+            when: reminderTime.getTime(),
+            periodInMinutes: 24 * 60 // Repeat daily
+        });
+        
+        console.debug('Daily reminder set for:', reminderTime);
+    } catch (error) {
+        console.error('Failed to setup daily reminder:', error);
+    }
+}
+
+// Listen for alarm
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name === 'dailyReminder') {
+        try {
+            const settings = await stateManager.loadState();
+            
+            // Check if reminders are still enabled and if it's a reminder day
+            if (settings.reminderEnabled) {
+                const today = new Date().toLocaleString('en-US', { weekday: 'long' });
+                if (settings.reminderDays.includes(today)) {
+                    await showReminder();
+                }
             }
-        };
+        } catch (error) {
+            console.error('Failed to handle reminder alarm:', error);
+        }
+    }
+});
+
+// Show reminder notification
+async function showReminder() {
+    try {
+        await chrome.notifications.create('dailyReminder', {
+            type: 'basic',
+            iconUrl: '/images/icon-128.png',
+            title: 'Daily Affirmation',
+            message: 'Time to check your daily affirmation!',
+            priority: 2
+        });
+    } catch (error) {
+        console.error('Failed to show reminder notification:', error);
+    }
+}
+
+// Initialize on install
+chrome.runtime.onInstalled.addListener(() => {
+    initialize().catch(error => {
+        console.error('Failed to initialize on install:', error);
     });
-} 
+});
+
+// Initialize on startup
+chrome.runtime.onStartup.addListener(() => {
+    initialize().catch(error => {
+        console.error('Failed to initialize on startup:', error);
+    });
+}); 

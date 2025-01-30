@@ -21,18 +21,33 @@ class BackupService {
     // Setup cloud sync
     async setupCloudSync() {
         try {
-            // Listen for changes in sync storage
-            chrome.storage.onChanged.addListener((changes, areaName) => {
-                if (areaName === 'sync' && changes.syncedData) {
-                    this.handleSyncedDataChange(changes.syncedData.newValue);
-                }
+            // Check if cloud sync is enabled
+            const settings = await stateManager.loadState();
+            if (!settings.cloudSyncEnabled) {
+                console.debug('Cloud sync is disabled');
+                return;
+            }
+
+            // Check authentication status
+            const isAuthenticated = await this.checkAuthStatus();
+            if (!isAuthenticated) {
+                console.debug('User not authenticated for cloud sync');
+                return;
+            }
+
+            // Attempt to sync from cloud
+            await this.syncFromCloud().catch(error => {
+                console.warn('Initial cloud sync failed, will retry later:', error);
+                // Don't throw here, just log the error
             });
 
-            // Initial sync from cloud
-            await this.syncFromCloud();
+            // Setup periodic sync
+            this.startPeriodicSync();
+
         } catch (error) {
-            console.error('Failed to setup cloud sync:', error);
-            // Don't throw here, just log the error
+            console.warn('Cloud sync setup failed:', error);
+            // Don't throw, just log the error and continue
+            // The app can still function without cloud sync
         }
     }
 
@@ -93,36 +108,26 @@ class BackupService {
     // Sync from cloud
     async syncFromCloud() {
         try {
-            const result = await chrome.storage.sync.get('syncedData');
-            const cloudData = result.syncedData;
+            const response = await fetch('/api/sync/get', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include'
+            });
 
-            if (!cloudData) {
-                // No cloud data yet, sync current settings to cloud
-                await this.syncToCloud();
-                return true;
+            if (!response.ok) {
+                throw new Error(`Cloud sync failed: ${response.statusText}`);
             }
 
-            const localSettings = stateManager.getSettings();
-            const localTimestamp = localSettings.lastSyncTime || '0';
-            const cloudTimestamp = cloudData.timestamp || '0';
-
-            // Only update if cloud data is newer
-            if (cloudTimestamp > localTimestamp) {
-                await stateManager.updateSettings({
-                    ...cloudData.settings,
-                    lastSyncTime: cloudTimestamp
-                });
-                this.lastSyncTime = new Date(cloudTimestamp);
-                showNotification('Sync Complete', 'Your settings have been updated from the cloud');
-            }
-
+            const cloudData = await response.json();
+            await this.mergeCloudData(cloudData);
+            
             return true;
         } catch (error) {
-            throw new BackupError(
-                'Failed to sync from cloud',
-                'SYNC_FROM_CLOUD_ERROR',
-                { originalError: error }
-            );
+            console.warn('Failed to sync from cloud:', error);
+            // Don't throw, return false to indicate sync failed
+            return false;
         }
     }
 

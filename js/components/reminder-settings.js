@@ -134,7 +134,7 @@ class ReminderSettings {
                 border: none;
                 cursor: pointer;
                 padding: 8px;
-                color: var(--color-text-primary);
+                color: white;
                 opacity: 0.7;
                 transition: all 0.2s;
                 border-radius: 50%;
@@ -147,6 +147,7 @@ class ReminderSettings {
 
             .reminder-body > div {
                 margin-bottom: 32px;
+                color: white;
             }
 
             .reminder-enable {
@@ -205,7 +206,7 @@ class ReminderSettings {
             .test-reminder-btn {
                 background: rgba(255, 255, 255, 0.08);
                 border: 1px solid rgba(255, 255, 255, 0.1);
-                color: var(--color-text-primary);
+                color: white;
                 padding: 10px 20px;
                 border-radius: 8px;
                 cursor: pointer;
@@ -228,7 +229,7 @@ class ReminderSettings {
             .weekday-btn {
                 background: rgba(255, 255, 255, 0.08);
                 border: none;
-                color: var(--color-text-primary);
+                color: white;
                 padding: 10px 16px;
                 border-radius: 8px;
                 cursor: pointer;
@@ -265,7 +266,7 @@ class ReminderSettings {
             .time-item input[type="time"] {
                 background: none;
                 border: none;
-                color: var(--color-text-primary);
+                color: white;
                 padding: 8px;
                 border-radius: 6px;
                 flex-grow: 1;
@@ -279,7 +280,7 @@ class ReminderSettings {
             .time-item .remove-time {
                 background: none;
                 border: none;
-                color: var(--color-text-primary);
+                color: white;
                 cursor: pointer;
                 opacity: 0.7;
                 transition: all 0.2s;
@@ -299,7 +300,7 @@ class ReminderSettings {
                 gap: 8px;
                 background: rgba(255, 255, 255, 0.08);
                 border: none;
-                color: var(--color-text-primary);
+                color: white;
                 padding: 12px;
                 border-radius: 8px;
                 cursor: pointer;
@@ -317,7 +318,7 @@ class ReminderSettings {
                 width: 100%;
                 background: rgba(255, 255, 255, 0.08);
                 border: 1px solid rgba(255, 255, 255, 0.1);
-                color: var(--color-text-primary);
+                color: white;
                 padding: 12px;
                 border-radius: 8px;
                 font-size: 0.95rem;

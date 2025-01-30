@@ -1,187 +1,140 @@
 # Daily Affirmations Chrome Extension
 
-A mindful new tab experience that transforms your daily browsing with inspirational affirmations, beautiful backgrounds, and productivity features.
+Transform your new tab into a daily source of inspiration with personalized affirmations, beautiful backgrounds, and mindful reminders.
 
-## 🚀 Quick Start
+## Features
 
-1. **Development Setup**
+- **Daily Affirmations**: Get inspired with a new affirmation every time you open a new tab
+- **Beautiful Backgrounds**: Dynamic nature-themed backgrounds that change daily
+- **Weather Widget**: Stay informed with current weather conditions (optional)
+- **Clock Display**: Keep track of time with an elegant clock widget (optional)
+- **Customizable Themes**:
+  - Multiple card styles (minimal, glass, solid)
+  - Various background themes (nature, minimal, architecture, abstract)
+  - Customizable font styles and text colors
+- **Daily Reminders**: Set personalized reminders for your daily affirmation practice
+- **Offline Support**: Works without internet connection
+- **Settings Persistence**: Your preferences are automatically saved and synced
+- **Data Backup**: Automatic backup system with rotation (keeps last 3 backups)
+
+## Installation
+
+1. Visit the [Chrome Web Store](https://chrome.google.com/webstore) (link coming soon)
+2. Click "Add to Chrome"
+3. Confirm the installation
+
+## Usage
+
+1. Open a new tab to see your daily affirmation
+2. Click the gear icon (⚙️) to access settings:
+   - Toggle weather and clock widgets
+   - Change card style and background theme
+   - Customize font and text color
+   - Set up daily reminders
+3. Click the menu icon (☰) to:
+   - View favorite affirmations
+   - Access custom collections
+   - View statistics
+   - Manage backup/restore
+
+## Default Settings
+
+The extension comes with carefully chosen defaults for the best experience:
+- Card Style: Minimal
+- Background Theme: Nature
+- Text Color: White (#FFFFFF)
+- Font Style: Default
+- Weather Widget: Enabled
+- Clock Widget: Enabled
+
+## Privacy & Security
+
+- No personal data collection
+- Local storage with secure backup
+- Optional weather widget requires location permission
+- All data stays in your browser
+- No third-party tracking
+
+## Technical Details
+
+### Architecture
+- Built with Manifest V3 specifications
+- Uses modern JavaScript/TypeScript
+- Service Worker for background operations
+- State management with automatic backup
+- IndexedDB for offline support
+
+### Storage
+- Uses chrome.storage.sync for settings
+- Local backup system with checksums
+- Automatic state validation
+- Error recovery mechanisms
+
+### APIs Used
+- Chrome Extension APIs
+- Weather API (OpenWeatherMap)
+- Background Images (Unsplash)
+
+## Development
+
+### Prerequisites
+- Node.js (v14 or higher)
+- npm or yarn
+
+### Setup
+1. Clone the repository:
 ```bash
-# Install dependencies
+git clone https://github.com/yourusername/daily-affirmations-extension.git
+cd daily-affirmations-extension
+```
+
+2. Install dependencies:
+```bash
 npm install
-
-# Build the extension
-npm run build
-
-# Watch for changes during development
-npm run watch
 ```
 
-2. **Load in Chrome**
-- Open Chrome and go to `chrome://extensions/`
-- Enable "Developer mode" in the top right
+3. Build the extension:
+```bash
+npm run build
+```
+
+4. Load in Chrome:
+- Open Chrome
+- Go to chrome://extensions/
+- Enable "Developer mode"
 - Click "Load unpacked"
-- Select the `chrome-extension` directory
+- Select the `dist` folder
 
-## 📁 Project Structure
+### Development Commands
+- `npm run dev`: Start development server
+- `npm run build`: Build for production
+- `npm run test`: Run tests
+- `npm run lint`: Lint code
 
-```
-chrome-extension/
-├── js/                    # JavaScript modules
-│   ├── actions/          # User interaction handlers
-│   ├── components/       # UI components
-│   ├── modules/          # Core modules
-│   ├── services/         # Feature services
-│   └── utils/            # Utility functions
-├── css/                  # Stylesheets
-│   ├── fonts.css        # Font definitions
-│   ├── styles.css       # Main styles
-│   └── premium.css      # Premium feature styles
-├── fonts/               # Local font files
-├── images/              # Extension icons and assets
-├── newtab.html         # New tab page
-├── manifest.json       # Extension manifest
-└── build.js           # Build script
-```
-
-## 🛠️ Features
-
-### Core Features
-- **Daily Affirmations**: Fresh inspirational quotes on each new tab
-- **Weather Widget**: Current weather with detailed information
-- **Clock Widget**: Time and date display
-- **Focus Mode**: Distraction-free interface
-- **Theme Customization**: Background themes and card styles
-
-### Premium Features
-- **Custom Affirmations**: Create and manage personal affirmations
-- **Daily Reminders**: Customizable notification schedules
-- **Cloud Sync**: Backup and sync across devices
-- **Premium Backgrounds**: Access to premium background collection
-- **Advanced Focus Mode**: Enhanced focus features
-
-## 🔧 Development
-
-### Building the Extension
-
-The extension uses a custom build process:
-
-```bash
-# Production build
-npm run build
-
-# Development build with watch
-npm run watch
-```
-
-### Key Files
-
-- `newtab.html`: The main new tab page
-- `js/app.js`: Main application logic
-- `js/services/`: Individual feature services
-- `manifest.json`: Extension configuration
-
-### Adding New Features
-
-1. Create a new service in `js/services/`
-2. Add UI components in `js/components/`
-3. Register in `app.js`
-4. Update manifest if needed
-
-## 🔒 Security
-
-- API keys are managed securely through backend services
-- Sensitive data is encrypted before storage
-- Premium features are validated server-side
-
-## 📦 Building for Production
-
-1. Update version in `manifest.json`
-2. Build the extension:
-```bash
-npm run build
-```
-3. ZIP the contents:
-```bash
-npm run package
-```
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-npm test
-
-# Run specific test suite
-npm test -- --suite=premium
-```
-
-## 🔄 State Management
-
-The extension uses a custom state management system:
-
-```javascript
-// Example state update
-stateManager.updateSettings({
-    showWeather: true,
-    backgroundTheme: 'nature'
-});
-```
-
-## 🎨 Styling
-
-- Uses CSS variables for theming
-- Supports multiple card styles (glass, solid, minimal)
-- Responsive design for different screen sizes
-
-## 📝 API Documentation
-
-### State Manager
-```javascript
-stateManager.getSettings()
-stateManager.updateSettings(newSettings)
-stateManager.loadState()
-```
-
-### Weather Service
-```javascript
-weatherService.update()
-weatherService.getWeather()
-```
-
-### Background Service
-```javascript
-backgroundService.update()
-backgroundService.saveBackground()
-```
-
-## 🐛 Debugging
-
-1. Open Chrome DevTools in the new tab
-2. Access debug console:
-```javascript
-window.app.serviceStatus  // Check service status
-window.app.cleanup       // Manual cleanup
-```
-
-## 📱 Chrome API Usage
-
-- `chrome.storage` for data persistence
-- `chrome.notifications` for reminders
-- `chrome.permissions` for feature access
-
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## 📄 License
+## Version History
 
-MIT License - see LICENSE file for details
+See [CHANGELOG.md](CHANGELOG.md) for details about each release.
 
-## 🆘 Support
+## License
 
-For issues and feature requests:
-- Open an issue on GitHub
-- Email: support@daily-affirmation.today # daily-affirmations
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Weather data provided by [OpenWeatherMap](https://openweathermap.org/)
+- Background images from [Unsplash](https://unsplash.com/)
+- Icons from [Material Design Icons](https://material.io/icons/)
+
+## Support
+
+- Report bugs via [GitHub Issues](https://github.com/yourusername/daily-affirmations-extension/issues)
+- Request features through [GitHub Discussions](https://github.com/yourusername/daily-affirmations-extension/discussions)
+- Email support: support@daily-affirmation.today

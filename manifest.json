@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "Daily Affirmations",
     "short_name": "Affirmations",
-    "version": "1.0",
+    "version": "1.0.1",
     "description": "Transform your new tab into a daily source of inspiration with personalized affirmations, beautiful backgrounds, and mindful reminders",
     "icons": {
         "16": "images/icon-16.png",
@@ -10,6 +10,7 @@
         "48": "images/icon-48.png",
         "128": "images/icon-128.png"
     },
+
     "action": {
         "default_icon": {
             "16": "images/icon-16.png",
@@ -36,19 +37,25 @@
         "https://www.daily-affirmation.today/*"
     ],
     "background": {
-        "service_worker": "js/background-worker.js"
+        "service_worker": "js/background-worker.js",
+        "type": "module"
     },
     "offline_enabled": true,
     "web_accessible_resources": [{
         "resources": [
+            "js/modules/*.js",
+            "js/services/*.js",
+            "js/utils/*.js",
             "fonts/*",
             "images/*",
             "css/*",
-            "js/*"
+            "js/*",
+            "*.js",
+            "*.html"
         ],
         "matches": ["<all_urls>"]
     }],
     "content_security_policy": {
-        "extension_pages": "script-src 'self'; object-src 'self'"
+        "extension_pages": "script-src 'self'; object-src 'self'; worker-src 'self'"
     }
 }

@@ -6,6 +6,11 @@
     "build": "node build.js"
   },
   "devDependencies": {
-    "crypto": "^1.0.1"
+    "@babel/core": "^7.26.7",
+    "@babel/preset-env": "^7.26.7",
+    "clean-css": "^5.3.3",
+    "crypto": "^1.0.1",
+    "terser": "^5.37.0",
+    "uglify-js": "^3.19.3"
   }
-} 
+}

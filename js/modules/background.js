@@ -1,8 +1,7 @@
-// Background Service Module
-import stateManager from '../modules/state.js';
+import stateManager from './state.js';
 import { requirePremium } from '../utils/premium.js';
 import { showNotification } from '../utils/common.js';
-import { authService } from './auth.js';
+import { authService } from '../services/auth.js';
 import { initializeConfig } from '../config.js';
 
 class BackgroundError extends Error {
@@ -77,13 +76,6 @@ class BackgroundService {
         chrome.notifications.onClicked.addListener(this.handleNotificationClick.bind(this));
         chrome.alarms.onAlarm.addListener(this.handleAlarm.bind(this));
 
-        // Initialize action click handler if available
-        if (chrome.action && chrome.action.onClicked) {
-            chrome.action.onClicked.addListener(() => {
-                this.handleActionClick();
-            });
-        }
-
         // Register service worker
         this.registerServiceWorker();
     }
@@ -107,10 +99,6 @@ class BackgroundService {
         }
     }
 
-    async handleActionClick() {
-        // Handle extension icon click
-        chrome.tabs.create({ url: 'newtab.html' });
-    }
 
     // Initialize API key
     async init(apiKey) {

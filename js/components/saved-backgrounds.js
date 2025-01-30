@@ -1,5 +1,5 @@
 // Saved Backgrounds Manager Component
-import backgroundService from '../services/background.js';
+import backgroundService from '../modules/background.js';
 import { showNotification } from '../utils/common.js';
 import { requirePremium } from '../utils/premium.js';
 import stateManager from '../modules/state.js';

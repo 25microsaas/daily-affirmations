@@ -1,7 +1,7 @@
-// Main App Module
+
 import stateManager from './modules/state.js';
 import weatherService from './services/weather.js';
-import backgroundService from './services/background.js';
+import backgroundService from './modules/background.js';
 import affirmationsService from './services/affirmations.js';
 import premiumService from './services/premium.js';
 import customAffirmationsService from './services/customAffirmations.js';
@@ -81,8 +81,14 @@ class App {
 
         try {
             // Initialize state first as other services depend on it
-            await stateManager.loadState();
+            const settings = await stateManager.loadState();
+            if (!settings) {
+                throw new Error('Failed to load settings');
+            }
             serviceStatus.state = true;
+
+            // Apply initial settings
+            this.applyInitialSettings(settings);
 
             // Get API keys first
             const keys = await getApiKeys();
@@ -189,6 +195,84 @@ class App {
             console.error('Service initialization failed:', error);
             this.handleInitializationError(error);
             throw error;
+        }
+    }
+
+    // Initialize the app
+    async initialize() {
+        if (this.initialized) return;
+
+        try {
+            console.debug('Initializing app...');
+            
+            // First, ensure settings are loaded
+            const settings = await stateManager.loadState();
+            if (!settings) {
+                throw new Error('Failed to load settings');
+            }
+            console.debug('Initial settings loaded:', settings);
+
+            // Initialize services
+            await this.initializeServices();
+            
+            // Apply initial settings before UI initialization
+            this.applyInitialSettings(settings);
+            
+            // Initialize UI components
+            await this.initializeUI();
+            
+            this.initialized = true;
+            console.debug('App initialization complete');
+        } catch (error) {
+            console.error('App initialization failed:', error);
+            this.handleInitializationError(error);
+        }
+    }
+
+    // Apply initial settings on app load
+    applyInitialSettings(settings) {
+        try {
+            console.debug('Applying initial settings:', settings);
+            
+            // Apply theme settings
+            this.applyThemeSettings(settings);
+
+            // Apply widget visibility
+            const weatherWidget = document.querySelector('.weather');
+            if (weatherWidget) {
+                weatherWidget.style.display = settings.showWeather ? 'block' : 'none';
+            }
+
+            const timeWidget = document.querySelector('.time-widget');
+            if (timeWidget) {
+                timeWidget.style.display = settings.showClock ? 'block' : 'none';
+            }
+
+            // Initialize UI controls with current values
+            const controls = {
+                showWeather: document.getElementById('showWeather'),
+                showClock: document.getElementById('showClock'),
+                backgroundTheme: document.getElementById('backgroundTheme'),
+                cardStyle: document.getElementById('cardStyle'),
+                fontStyle: document.getElementById('fontStyle'),
+                textColor: document.getElementById('textColor')
+            };
+
+            // Set control values
+            if (controls.showWeather) controls.showWeather.checked = settings.showWeather;
+            if (controls.showClock) controls.showClock.checked = settings.showClock;
+            if (controls.backgroundTheme) controls.backgroundTheme.value = settings.backgroundTheme;
+            if (controls.cardStyle) controls.cardStyle.value = settings.cardStyle;
+            if (controls.fontStyle) controls.fontStyle.value = settings.fontStyle;
+            if (controls.textColor) controls.textColor.value = settings.textColor;
+
+            console.debug('Initial settings applied successfully');
+        } catch (error) {
+            console.error('Failed to apply initial settings:', error);
+            // Continue with default settings
+            const defaultSettings = stateManager.getSettings();
+            console.debug('Falling back to default settings:', defaultSettings);
+            this.applyThemeSettings(defaultSettings);
         }
     }
 
@@ -386,6 +470,7 @@ class App {
         const cardStyleSelect = document.getElementById('cardStyle');
         const fontStyleSelect = document.getElementById('fontStyle');
         const textColorInput = document.getElementById('textColor');
+        const resetButton = document.getElementById('resetSettings');
 
         // Initialize settings with current values
         const settings = stateManager.getSettings();
@@ -416,44 +501,98 @@ class App {
             }
         });
 
+        // Theme settings event listeners with improved error handling
         backgroundThemeSelect?.addEventListener('change', async (e) => {
-            const newTheme = e.target.value;
-            await stateManager.updateSettings({ backgroundTheme: newTheme });
-            
-            // Clear the background cache to force new image fetch
-            await chrome.storage.local.remove('background_data');
-            
-            // Update background with new theme
-            await backgroundService.update();
-            
-            // Show notification
-            showNotification('Theme Updated', 'Background theme has been changed');
+            try {
+                const newTheme = e.target.value;
+                await stateManager.updateSettings({ backgroundTheme: newTheme });
+                
+                // Clear the background cache to force new image fetch
+                await chrome.storage.local.remove('background_data');
+                
+                // Update background with new theme
+                await backgroundService.update();
+                
+                showNotification('Theme Updated', 'Background theme has been changed');
+            } catch (error) {
+                console.error('Failed to update background theme:', error);
+                showNotification('Error', 'Failed to update background theme');
+                // Reset select to current value
+                e.target.value = stateManager.getSettings().backgroundTheme;
+            }
         });
 
-        cardStyleSelect?.addEventListener('change', (e) => {
-            const newStyle = e.target.value;
-            stateManager.updateSettings({ cardStyle: newStyle });
-            this.updateCardStyles(newStyle);
+        cardStyleSelect?.addEventListener('change', async (e) => {
+            try {
+                const newStyle = e.target.value;
+                await stateManager.updateSettings({ cardStyle: newStyle });
+                this.updateCardStyles(newStyle);
+                showNotification('Style Updated', 'Card style has been changed');
+            } catch (error) {
+                console.error('Failed to update card style:', error);
+                showNotification('Error', 'Failed to update card style');
+                // Reset select to current value
+                e.target.value = stateManager.getSettings().cardStyle;
+            }
         });
 
-        fontStyleSelect?.addEventListener('change', (e) => {
-            const newFont = e.target.value;
-            stateManager.updateSettings({ fontStyle: newFont });
-            
-            // Remove all font classes using a more robust approach
-            const classes = document.body.className.split(' ');
-            const nonFontClasses = classes.filter(cls => !cls.startsWith('font-'));
-            document.body.className = nonFontClasses.join(' ');
-            
-            // Add the new font class and ensure font-fallback is present
-            document.body.classList.add(`font-${newFont}`, 'font-fallback');
+        fontStyleSelect?.addEventListener('change', async (e) => {
+            try {
+                const newFont = e.target.value;
+                await stateManager.updateSettings({ fontStyle: newFont });
+                document.body.className = document.body.className
+                    .split(' ')
+                    .filter(cls => !cls.startsWith('font-'))
+                    .join(' ');
+                document.body.classList.add(`font-${newFont}`, 'font-fallback');
+                showNotification('Font Updated', 'Font style has been changed');
+            } catch (error) {
+                console.error('Failed to update font style:', error);
+                showNotification('Error', 'Failed to update font style');
+                // Reset select to current value
+                e.target.value = stateManager.getSettings().fontStyle;
+            }
         });
 
-        textColorInput?.addEventListener('change', (e) => {
-            const newColor = e.target.value;
-            stateManager.updateSettings({ textColor: newColor });
-            document.documentElement.style.setProperty('--color-text-primary', newColor);
-            document.documentElement.style.setProperty('--color-text-secondary', this.adjustColorOpacity(newColor, 0.7));
+        textColorInput?.addEventListener('change', async (e) => {
+            try {
+                const newColor = e.target.value;
+                if (!/^#[0-9A-Fa-f]{6}$/.test(newColor)) {
+                    throw new Error('Invalid color format');
+                }
+                await stateManager.updateSettings({ textColor: newColor });
+                document.documentElement.style.setProperty('--color-text-primary', newColor);
+                document.documentElement.style.setProperty('--color-text-secondary', this.adjustColorOpacity(newColor, 0.7));
+                showNotification('Color Updated', 'Text color has been changed');
+            } catch (error) {
+                console.error('Failed to update text color:', error);
+                showNotification('Error', 'Failed to update text color');
+                // Reset input to current value
+                e.target.value = stateManager.getSettings().textColor;
+            }
+        });
+
+        // Reset settings button
+        resetButton?.addEventListener('click', async () => {
+            try {
+                // Show loading state
+                resetButton.disabled = true;
+                resetButton.textContent = 'Resetting...';
+
+                // Reset settings in the background
+                await stateManager.resetToDefaults();
+
+                // Reload the page to apply all default settings
+                window.location.reload();
+            } catch (error) {
+                console.error('Failed to reset settings:', error);
+                // Show error state
+                resetButton.textContent = 'Reset Failed';
+                setTimeout(() => {
+                    resetButton.disabled = false;
+                    resetButton.textContent = 'Reset Settings';
+                }, 2000);
+            }
         });
 
         // Settings panel toggle
@@ -481,29 +620,80 @@ class App {
         });
     }
 
-    // Apply theme settings
+    // Apply theme settings with validation
     applyThemeSettings(settings) {
-        // Apply card style
-        this.updateCardStyles(settings.cardStyle);
+        try {
+            // Validate settings
+            if (!settings) {
+                throw new Error('Invalid settings object');
+            }
 
-        // Apply font style while maintaining font-fallback
-        document.body.className = document.body.className
-            .replace(/font-\w+/, '')
-            .trim();
-        document.body.classList.add(`font-${settings.fontStyle}`, 'font-fallback');
+            // Apply card style
+            if (settings.cardStyle && ['glass', 'solid', 'minimal'].includes(settings.cardStyle)) {
+                this.updateCardStyles(settings.cardStyle);
+            }
 
-        // Apply text color
-        document.documentElement.style.setProperty('--color-text-primary', settings.textColor);
-        document.documentElement.style.setProperty('--color-text-secondary', this.adjustColorOpacity(settings.textColor, 0.7));
+            // Apply font style
+            if (settings.fontStyle && ['default', 'serif', 'monospace'].includes(settings.fontStyle)) {
+                document.body.className = document.body.className
+                    .split(' ')
+                    .filter(cls => !cls.startsWith('font-'))
+                    .join(' ');
+                document.body.classList.add(`font-${settings.fontStyle}`, 'font-fallback');
+            }
+
+            // Apply text color
+            if (settings.textColor && /^#[0-9A-Fa-f]{6}$/.test(settings.textColor)) {
+                document.documentElement.style.setProperty('--color-text-primary', settings.textColor);
+                document.documentElement.style.setProperty('--color-text-secondary', this.adjustColorOpacity(settings.textColor, 0.7));
+            }
+
+        } catch (error) {
+            console.error('Failed to apply theme settings:', error);
+            // Fallback to default settings
+            this.applyThemeSettings(stateManager.getSettings());
+        }
     }
 
-    // Update card styles
+    // Update card styles with cleanup
     updateCardStyles(style) {
-        const widgets = document.querySelectorAll('.glass, .solid, .minimal');
-        widgets.forEach(widget => {
-            widget.classList.remove('glass', 'solid', 'minimal');
-            widget.classList.add(style);
-        });
+        try {
+            if (!['glass', 'solid', 'minimal'].includes(style)) {
+                throw new Error('Invalid card style');
+            }
+
+            const widgets = document.querySelectorAll('.weather, .time-widget, .affirmation-card, .settings-button, .menu-button, .photo-credit, .focus-mode-button, .settings-panel, .menu-panel');
+            widgets.forEach(widget => {
+                widget.classList.remove('glass', 'solid', 'minimal');
+                widget.classList.add(style);
+            });
+
+            // Clean up any existing observer
+            if (this.cardStyleObserver) {
+                this.cardStyleObserver.disconnect();
+            }
+
+            // Setup new observer
+            this.cardStyleObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.classList &&
+                            (node.classList.contains('glass') ||
+                            node.classList.contains('solid') ||
+                            node.classList.contains('minimal'))) {
+                            node.classList.remove('glass', 'solid', 'minimal');
+                            node.classList.add(style);
+                        }
+                    });
+                });
+            });
+
+            this.cardStyleObserver.observe(document.body, { childList: true, subtree: true });
+        } catch (error) {
+            console.error('Failed to update card styles:', error);
+            // Fallback to default style
+            this.updateCardStyles('glass');
+        }
     }
 
     // Adjust color opacity
@@ -566,20 +756,6 @@ class App {
         document.body.appendChild(errorContainer);
     }
 
-    // Initialize the app
-    async initialize() {
-        if (this.initialized) return;
-
-        try {
-            // Initialize services
-            await this.initializeServices();
-            await this.initializeUI();
-            this.initialized = true;
-        } catch (error) {
-            this.handleInitializationError(error);
-        }
-    }
-
     // Cleanup resources
     cleanup() {
         // Clean up draggable widgets
@@ -595,6 +771,12 @@ class App {
 
         // Clean up daily reminder service
         dailyReminderService.cleanup();
+
+        // Clean up card style observer
+        if (this.cardStyleObserver) {
+            this.cardStyleObserver.disconnect();
+            this.cardStyleObserver = null;
+        }
     }
 }
 

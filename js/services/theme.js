@@ -55,46 +55,121 @@ class ThemeService {
                 }
             }
         ];
+        this.init();
     }
 
-    // Get current theme
+    async init() {
+        try {
+            const theme = this.getCurrentTheme();
+            await this.applyTheme(theme);
+        } catch (error) {
+            console.error('Failed to initialize theme:', error);
+            // Fallback to default theme
+            await this.applyTheme(this.defaultThemes[0]);
+        }
+    }
+
+    // Get current theme with validation
     getCurrentTheme() {
-        const settings = stateManager.getSettings();
-        return settings.theme || this.defaultThemes[0];
+        try {
+            const settings = stateManager.getSettings();
+            const theme = settings.theme;
+            
+            // Validate theme structure
+            if (!theme || !this.isValidTheme(theme)) {
+                console.warn('Invalid theme detected, falling back to default');
+                return this.defaultThemes[0];
+            }
+            
+            return theme;
+        } catch (error) {
+            console.error('Error getting current theme:', error);
+            return this.defaultThemes[0];
+        }
     }
 
-    // Apply theme to document
-    applyTheme(theme = this.getCurrentTheme()) {
-        const root = document.documentElement;
-        const { colors, fonts, glassMorphism } = theme;
-
-        // Apply colors
-        Object.entries(colors).forEach(([key, value]) => {
-            root.style.setProperty(`--color-${key}`, value);
-        });
-
-        // Apply fonts
-        Object.entries(fonts).forEach(([key, value]) => {
-            root.style.setProperty(`--font-${key}`, value);
-        });
-
-        // Apply glass morphism
-        Object.entries(glassMorphism).forEach(([key, value]) => {
-            root.style.setProperty(`--glass-${key}`, value);
-        });
-
-        // Apply theme class
-        document.body.className = document.body.className
-            .replace(/theme-\w+/, '')
-            .trim();
-        document.body.classList.add(`theme-${theme.id}`);
+    // Validate theme object structure
+    isValidTheme(theme) {
+        return theme &&
+            typeof theme === 'object' &&
+            theme.id &&
+            theme.colors &&
+            typeof theme.colors === 'object' &&
+            theme.fonts &&
+            typeof theme.fonts === 'object' &&
+            theme.glassMorphism &&
+            typeof theme.glassMorphism === 'object';
     }
 
-    // Update theme settings
+    // Apply theme to document with error handling
+    async applyTheme(theme = this.getCurrentTheme()) {
+        try {
+            const root = document.documentElement;
+            const { colors, fonts, glassMorphism } = theme;
+
+            // Validate required theme properties
+            if (!colors || !fonts || !glassMorphism) {
+                throw new Error('Invalid theme structure');
+            }
+
+            // Apply colors with validation
+            Object.entries(colors).forEach(([key, value]) => {
+                if (value && typeof value === 'string') {
+                    root.style.setProperty(`--color-${key}`, value);
+                }
+            });
+
+            // Apply fonts with validation
+            Object.entries(fonts).forEach(([key, value]) => {
+                if (value && typeof value === 'string') {
+                    root.style.setProperty(`--font-${key}`, value);
+                }
+            });
+
+            // Apply glass morphism with validation
+            Object.entries(glassMorphism).forEach(([key, value]) => {
+                if (value && typeof value === 'string') {
+                    root.style.setProperty(`--glass-${key}`, value);
+                }
+            });
+
+            // Apply theme class safely
+            document.body.className = document.body.className
+                .split(' ')
+                .filter(cls => !cls.startsWith('theme-'))
+                .join(' ');
+            document.body.classList.add(`theme-${theme.id}`);
+
+            // Save theme to storage
+            await this.persistTheme(theme);
+
+        } catch (error) {
+            console.error('Failed to apply theme:', error);
+            // Fallback to default theme
+            if (theme !== this.defaultThemes[0]) {
+                await this.applyTheme(this.defaultThemes[0]);
+            }
+            throw new ThemeError('Failed to apply theme', 'APPLY_THEME_ERROR', { originalError: error });
+        }
+    }
+
+    // Safely persist theme to storage
+    async persistTheme(theme) {
+        try {
+            await stateManager.updateSettings({ theme });
+        } catch (error) {
+            console.error('Failed to persist theme:', error);
+            throw new ThemeError('Failed to save theme', 'SAVE_THEME_ERROR', { originalError: error });
+        }
+    }
+
+    // Update theme settings with validation
     async updateTheme(themeSettings) {
         try {
             return await requirePremium('theme_settings', async () => {
                 const currentTheme = this.getCurrentTheme();
+                
+                // Validate new theme settings
                 const newTheme = {
                     ...currentTheme,
                     ...themeSettings,
@@ -102,9 +177,11 @@ class ThemeService {
                     name: 'Custom'
                 };
 
-                await stateManager.updateSettings({ theme: newTheme });
-                this.applyTheme(newTheme);
+                if (!this.isValidTheme(newTheme)) {
+                    throw new Error('Invalid theme settings');
+                }
 
+                await this.applyTheme(newTheme);
                 return newTheme;
             });
         } catch (error) {
@@ -152,18 +229,6 @@ class ThemeService {
             name: font,
             value: `${font}, system-ui, sans-serif`
         }));
-    }
-
-    // Initialize theme service
-    initialize() {
-        try {
-            const currentTheme = this.getCurrentTheme();
-            this.applyTheme(currentTheme);
-        } catch (error) {
-            console.error('Failed to initialize theme:', error);
-            // Fallback to default theme
-            this.applyTheme(this.defaultThemes[0]);
-        }
     }
 }
 
