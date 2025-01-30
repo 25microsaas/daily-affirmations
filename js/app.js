@@ -1,4 +1,3 @@
-
 import stateManager from './modules/state.js';
 import weatherService from './services/weather.js';
 import backgroundService from './modules/background.js';
@@ -166,13 +165,14 @@ class App {
                 );
             }
 
-            if (serviceStatus.background) {
-                updatePromises.push(
-                    backgroundService.update().catch(error => {
-                        console.error('Background update failed:', error);
-                    })
-                );
-            }
+            // Skip background update as it's handled in background service initialization
+            // if (serviceStatus.background) {
+            //     updatePromises.push(
+            //         backgroundService.update().catch(error => {
+            //             console.error('Background update failed:', error);
+            //         })
+            //     );
+            // }
 
             // Affirmations don't require initialization
             updatePromises.push(

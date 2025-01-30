@@ -102,13 +102,21 @@ class BackgroundService {
 
     // Initialize API key
     async init(apiKey) {
+        if (this.initialized) {
+            console.debug('Background service already initialized');
+            return true;
+        }
+
         if (!apiKey) {
             throw new BackgroundError('API key is required', 'API_KEY_MISSING');
         }
 
         this.API_KEY = apiKey;
         await this.loadCachedData();
-        this.initialized = true;
+        
+        // Initialize background after setting API key
+        await this.initialize();
+        
         return true;
     }
 
@@ -423,48 +431,30 @@ class BackgroundService {
         }
     }
 
-    // Get random background from Unsplash
+    // Get random background
     async getRandomBackground() {
-        if (this.offlineMode) {
-            return this.getOfflineBackground();
-        }
-
         try {
-            if (!this.API_KEY) {
-                console.warn('No API key available, using offline background');
+            if (this.offlineMode) {
                 return this.getOfflineBackground();
             }
 
-            const query = this.getBackgroundQuery();
-            const endpoint = `https://api.unsplash.com/photos/random?query=${query}&orientation=landscape&content_filter=high`;
-
-            const response = await fetch(endpoint, {
-                headers: {
-                    'Authorization': `Client-ID ${this.API_KEY}`,
-                    'Accept': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new BackgroundError(
-                    'Failed to fetch from Unsplash',
-                    'API_ERROR',
-                    { status: response.status }
-                );
+            // Try to get a new background from Unsplash
+            try {
+                const data = await this.fetchBackground();
+                return {
+                    id: data.id,
+                    url: data.urls.regular,
+                    credit: `Photo by ${data.user.name} on Unsplash`,
+                    location: data.location?.name || data.location?.city || data.location?.country || null,
+                    addedAt: new Date().toISOString()
+                };
+            } catch (error) {
+                console.error('Failed to fetch online background:', error);
+                return this.getOfflineBackground();
             }
-
-            const data = await response.json();
-
-            return {
-                id: data.id,
-                url: data.urls.regular,
-                thumbnail: data.urls.thumb,
-                credit: `Photo by ${data.user.name} on Unsplash`,
-                location: data.location?.name || data.location?.city || data.location?.country || null
-            };
         } catch (error) {
-            console.warn('Failed to fetch online background:', error);
-            return this.getOfflineBackground();
+            console.error('Failed to get random background:', error);
+            return this.defaultBackgrounds[0];
         }
     }
 
@@ -501,6 +491,12 @@ class BackgroundService {
 
     // Update background display with mode handling
     async updateBackgroundDisplay(background, setAsFixed = true) {
+        // Skip if not initialized yet
+        if (!this.initialized && !setAsFixed) {
+            console.debug('Skipping update - not initialized yet');
+            return background;
+        }
+
         try {
             const overlay = document.getElementById('background-overlay');
             const creditLink = document.getElementById('photo-credit-link');
@@ -508,6 +504,13 @@ class BackgroundService {
 
             if (!overlay || !creditLink || !locationElement) {
                 throw new BackgroundError('Required elements not found', 'ELEMENTS_MISSING');
+            }
+
+            // Check if we should update when in fixed mode
+            const settings = stateManager.getSettings();
+            if (settings.backgroundMode === 'fixed' && settings.currentBackground && !setAsFixed) {
+                console.debug('Skipping update - fixed background mode active');
+                return settings.currentBackground;
             }
 
             // Load and validate the image first
@@ -530,19 +533,29 @@ class BackgroundService {
             // Update location if available
             locationElement.textContent = background.location ? `📍 ${background.location}` : '';
 
-            // Save as current background in settings with mode
-            await stateManager.updateSettings({
-                currentBackground: setAsFixed ? {
-                    ...background,
-                    addedAt: background.addedAt || new Date().toISOString()
-                } : null,
-                backgroundMode: setAsFixed ? 'fixed' : 'random'
-            });
+            // Save background state
+            const backgroundState = {
+                ...background,
+                addedAt: background.addedAt || new Date().toISOString()
+            };
+
+            // Update settings with the new state
+            if (this.initialized) {
+                await stateManager.updateSettings({
+                    currentBackground: setAsFixed ? backgroundState : null,
+                    backgroundMode: setAsFixed ? 'fixed' : 'random',
+                    lastBackground: backgroundState
+                });
+            }
+
+            // Cache the current background
+            this.currentBackground = backgroundState;
+            this.cachedBackgrounds.set(background.url, backgroundState);
 
             // Update save button state
             await this.updateSaveButtonState();
 
-            return background;
+            return backgroundState;
         } catch (error) {
             console.error('Failed to update background display:', error);
             showNotification('Error', 'Failed to update background');
@@ -569,19 +582,31 @@ class BackgroundService {
 
     // Refresh background
     async refreshBackground() {
-        const settings = stateManager.getSettings();
-        if (settings.currentBackground && settings.backgroundMode === 'fixed') {
-            // If we have a current background and we're in fixed mode, use it
-            return this.updateBackgroundDisplay(settings.currentBackground, true);
-        } else {
-            // Otherwise get a new random background
-            const background = await this.getRandomBackground();
-            return this.updateBackgroundDisplay(background, false);
+        try {
+            const settings = stateManager.getSettings();
+            console.debug('Refreshing background with settings:', settings);
+
+            if (settings.backgroundMode === 'fixed' && settings.currentBackground) {
+                console.debug('Keeping fixed background:', settings.currentBackground);
+                return settings.currentBackground;
+            } else {
+                console.debug('Getting new random background');
+                const background = await this.getRandomBackground();
+                return this.updateBackgroundDisplay(background, false);
+            }
+        } catch (error) {
+            console.error('Failed to refresh background:', error);
+            return this.updateBackgroundDisplay(this.defaultBackgrounds[0], false);
         }
     }
 
     // Initialize background service with mode handling
     async initialize() {
+        if (this.initialized) {
+            console.debug('Background service already initialized');
+            return;
+        }
+
         try {
             // Check if offline
             this.offlineMode = !navigator.onLine;
@@ -591,24 +616,31 @@ class BackgroundService {
                 this.defaultBackgrounds.map(bg => this.loadImage(bg.url))
             );
 
-            // Check settings for fixed background
+            // Get current settings
             const settings = stateManager.getSettings();
+            console.debug('Current settings on init:', settings);
+
+            // Set initialized flag before updating display
+            this.initialized = true;
 
             if (settings.backgroundMode === 'fixed' && settings.currentBackground) {
-                // If in fixed mode and has current background, restore it
+                // Restore fixed background
+                console.debug('Restoring fixed background:', settings.currentBackground);
+                this.currentBackground = settings.currentBackground;
                 await this.updateBackgroundDisplay(settings.currentBackground, true);
-            } else if (settings.backgroundMode === 'random') {
-                // If in random mode, get a new random background
-                await this.refreshBackground();
             } else {
-                // Default to random mode if no mode is set
-                await this.setBackgroundMode('random');
-                await this.refreshBackground();
+                // Start in random mode
+                console.debug('Starting in random mode');
+                const background = await this.getRandomBackground();
+                await this.updateBackgroundDisplay(background, false);
             }
+
+            console.debug('Background service initialized with mode:', settings.backgroundMode);
         } catch (error) {
             console.error('Failed to initialize background service:', error);
-            // Fallback to first default background in fixed mode
-            await this.updateBackgroundDisplay(this.defaultBackgrounds[0], true);
+            // Fallback to first default background in random mode
+            this.initialized = true;
+            await this.updateBackgroundDisplay(this.defaultBackgrounds[0], false);
         }
     }
 
