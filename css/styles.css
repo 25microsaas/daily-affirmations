@@ -12,6 +12,8 @@
     --color-text-primary: rgba(255, 255, 255, 0.9);
     --color-text-secondary: rgba(255, 255, 255, 0.7);
     --color-border: rgba(255, 255, 255, 0.1);
+    --color-border-light: rgba(255, 255, 255, 0.05); /* Lighter border for subtle lines */
+    --color-danger: #ef4444; /* For delete buttons etc. */
     
     /* Accent colors */
     --accent-color: #4f46e5;
@@ -54,11 +56,13 @@
     
     /* Transitions */
     --transition-default: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     
     /* Radius */
     --radius-lg: 20px;
-    --radius-md: 16px;
+    --radius-md: 16px; /* Changed from radius-md to border-radius-medium for consistency with new CSS */
     --radius-sm: 12px;
+    --border-radius-medium: 12px; /* For consistency with new CSS */
 }
 
 /* Global Styles */
@@ -113,6 +117,8 @@ body {
 
 .draggable-widget {
     cursor: move;
+    padding: var(--space-md); /* Added default padding for draggable widgets */
+    border-radius: var(--radius-md); /* Consistent border radius */
 }
 
 .widget-handle {
@@ -2234,4 +2240,208 @@ body.font-monospace {
     color: var(--color-text-secondary);
     font-size: 0.875rem;
     margin: 0;
+}
+
+/* Notes Widget Styles */
+#notes-widget {
+    /* Assuming draggable-widget and glass/solid/minimal provide base styling */
+    /* Specific styles for notes widget if needed */
+    display: flex; /* Use flex for internal layout */
+    flex-direction: column;
+    max-height: 400px; /* Or a suitable max height */
+}
+
+#notes-widget h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.notes-list-container {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 5px; /* For scrollbar spacing */
+    margin-bottom: 10px;
+}
+
+.note-item {
+    background-color: rgba(255, 255, 255, 0.1); /* Slightly different background for items */
+    border-radius: var(--border-radius-medium);
+    padding: 10px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start; /* Align items to the start for multi-line notes */
+    word-break: break-word; /* Ensure long words don't overflow */
+}
+
+.note-item p {
+    margin: 0;
+    flex-grow: 1;
+    padding-right: 10px; /* Space before delete button */
+}
+
+.notes-add-new {
+    display: flex;
+    flex-direction: column; /* Stack textarea and button */
+    margin-top: auto; /* Pushes to the bottom if notes-list-container is not full */
+}
+
+#newNoteTextarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-medium);
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-primary);
+    margin-bottom: 8px;
+    resize: vertical; /* Allow vertical resize */
+}
+
+#saveNoteButton.add-button { /* More specific selector if needed */
+    padding: 8px 12px;
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius-medium);
+    cursor: pointer;
+    text-align: center;
+}
+#saveNoteButton.add-button:hover {
+    background-color: var(--accent-color-dark);
+}
+
+
+/* Todo List Widget Styles */
+#todo-widget {
+    /* Assuming draggable-widget and glass/solid/minimal provide base styling */
+    display: flex;
+    flex-direction: column;
+    max-height: 400px; /* Or a suitable max height */
+}
+
+#todo-widget h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.todo-input-container {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+#newTodoInput {
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-medium) 0 0 var(--border-radius-medium); /* Rounded left corners */
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-primary);
+}
+
+#addTodoButton.add-button {
+    padding: 8px 12px;
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 0 var(--border-radius-medium) var(--border-radius-medium) 0; /* Rounded right corners */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+#addTodoButton.add-button i {
+    margin-right: 4px;
+}
+#addTodoButton.add-button:hover {
+    background-color: var(--accent-color-dark);
+}
+
+.todo-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 5px; /* For scrollbar spacing */
+}
+
+.todo-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 0; /* Padding top/bottom, no side padding as checkbox and button have their own */
+    border-bottom: 1px solid var(--color-border-light);
+}
+.todo-item:last-child {
+    border-bottom: none;
+}
+
+.todo-checkbox {
+    margin-right: 10px;
+    /* Custom checkbox styles can be added here if desired */
+    transform: scale(1.1); /* Slightly larger checkbox */
+    accent-color: var(--accent-color); /* Color the checkbox */
+}
+
+.todo-text {
+    flex-grow: 1;
+    color: var(--color-text-primary);
+    word-break: break-word; /* Break long words */
+}
+
+.todo-item.completed .todo-text {
+    text-decoration: line-through;
+    color: var(--color-text-secondary); /* Faded color for completed items */
+}
+
+/* Common styles for delete buttons in widgets */
+.note-item .delete-button,
+.todo-item .delete-button {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: 4px; /* Small padding to make it easier to click */
+    margin-left: 8px; /* Space from the content */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+.note-item .delete-button:hover,
+.todo-item .delete-button:hover {
+    color: var(--color-danger); /* Or a more prominent hover color */
+    background-color: rgba(255,255,255,0.1);
+}
+.note-item .delete-button i,
+.todo-item .delete-button i {
+    font-size: 18px; /* Adjust icon size */
+}
+
+/* Empty state messages */
+.empty-state-message {
+    text-align: center;
+    color: var(--color-text-secondary);
+    padding: 20px;
+    font-style: italic;
+}
+
+/* Ensure widget handle (⋮) is styled appropriately if not already */
+.widget-handle {
+    /* Add any specific styles if needed, e.g., text color, padding */
+    /* This might already be globally styled */
+}
+
+/* Menu item icons in panel */
+#menuPanel .menu-item i.material-icons-round {
+    margin-right: 15px; /* Align with existing menu items */
+    vertical-align: middle;
+}
+
+/* Hidden class (if not already globally defined robustly) */
+.hidden {
+    display: none !important;
 }

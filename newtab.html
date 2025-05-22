@@ -222,6 +222,20 @@
         </div>
 
         <div class="menu-group">
+          <h4>Tools</h4>
+          <ul>
+            <li id="toggleNotesButton" class="menu-item">
+              <i class="material-icons-round">description</i>
+              Notes
+            </li>
+            <li id="toggleTodoButton" class="menu-item">
+              <i class="material-icons-round">checklist</i>
+              Todo List
+            </li>
+          </ul>
+        </div>
+
+        <div class="menu-group">
           <h4>Settings</h4>
           <ul>
             <li class="daily-reminders-item">
@@ -428,6 +442,34 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Notes Widget -->
+    <div id="notes-widget" class="draggable-widget glass hidden"> <!-- Start hidden -->
+        <div class="widget-handle">⋮</div>
+        <h3>Notes</h3>
+        <div class="notes-list-container">
+            <!-- Notes will be dynamically populated here -->
+        </div>
+        <div class="notes-add-new">
+             <textarea id="newNoteTextarea" placeholder="Type your note..."></textarea>
+             <button id="saveNoteButton" class="add-button">Add Note</button>
+        </div>
+    </div>
+
+    <!-- Todo List Widget -->
+    <div id="todo-widget" class="draggable-widget glass hidden"> <!-- Start hidden -->
+        <div class="widget-handle">⋮</div>
+        <h3>Todo List</h3>
+        <div class="todo-input-container">
+            <input type="text" id="newTodoInput" placeholder="Add a new todo...">
+            <button id="addTodoButton" class="add-button">
+                <i class="material-icons-round">add</i> Add
+            </button>
+        </div>
+        <ul class="todo-list">
+            <!-- Todo items will be dynamically populated here -->
+        </ul>
     </div>
 
     <!-- Scripts -->

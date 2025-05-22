@@ -6,6 +6,8 @@ import affirmationsService from './services/affirmations.js';
 import premiumService from './services/premium.js';
 import customAffirmationsService from './services/customAffirmations.js';
 import dailyReminderService from './services/dailyReminder.js';
+import notesService from './services/notes.js';
+import todoService from './services/todo.js';
 import reminderSettings from './components/reminder-settings.js';
 import { animations, makeDraggable, showNotification } from './utils/common.js';
 import { setupAffirmationActions } from './actions/affirmationActions.js';
@@ -76,7 +78,9 @@ class App {
             affirmations: false,
             customAffirmations: false,
             dailyReminder: false,
-            backup: false
+            backup: false,
+            notes: false,
+            todo: false
         };
 
         try {
@@ -146,7 +150,23 @@ class App {
                     .catch(error => {
                         console.error('Backup service initialization failed:', error);
                         return false;
-                    })
+                    }),
+
+                // Notes service initialization
+                notesService.initialize()
+                    .then(() => serviceStatus.notes = true)
+                    .catch(error => {
+                        console.error('Notes service initialization failed:', error);
+                        return false;
+                    }),
+
+                // Todo service initialization
+                todoService.initialize()
+                    .then(() => serviceStatus.todo = true)
+                    .catch(error => {
+                        console.error('Todo service initialization failed:', error);
+                        return false;
+                    }),
             ]);
 
             // Update services that successfully initialized
@@ -192,6 +212,100 @@ class App {
         }
     }
 
+    // Render Notes
+    async renderNotes() {
+        const notes = await notesService.getNotes();
+        const notesListContainer = document.querySelector('#notes-widget .notes-list-container');
+        if (!notesListContainer) return;
+
+        notesListContainer.innerHTML = ''; // Clear existing notes
+
+        if (notes.length === 0) {
+            notesListContainer.innerHTML = '<p class="empty-state-message">No notes yet. Add one below!</p>';
+            return;
+        }
+
+        notes.forEach(note => {
+            const noteElement = document.createElement('div');
+            noteElement.className = 'note-item glass'; // Added glass for consistency
+            noteElement.dataset.noteId = note.id;
+            
+            const noteContent = document.createElement('p');
+            noteContent.textContent = note.content;
+            // Allow editing directly in the future, for now, just display
+            // noteContent.setAttribute('contenteditable', 'true'); 
+            // noteContent.addEventListener('blur', (e) => {
+            //    notesService.updateNote(note.id, e.target.textContent);
+            // });
+
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-button';
+            deleteButton.innerHTML = '<i class="material-icons-round">delete</i>';
+            deleteButton.title = 'Delete Note';
+            deleteButton.addEventListener('click', async () => {
+                await notesService.deleteNote(note.id);
+                this.renderNotes(); // Re-render
+            });
+
+            noteElement.appendChild(noteContent);
+            noteElement.appendChild(deleteButton);
+            notesListContainer.appendChild(noteElement);
+        });
+    }
+
+    // Render Todos
+    async renderTodos() {
+        const todos = await todoService.getTodos();
+        const todoListElement = document.querySelector('#todo-widget .todo-list');
+        if (!todoListElement) return;
+
+        todoListElement.innerHTML = ''; // Clear existing todos
+
+        if (todos.length === 0) {
+            todoListElement.innerHTML = '<li class="empty-state-message">No todos yet. Add one above!</li>';
+            return;
+        }
+
+        todos.forEach(todo => {
+            const todoItem = document.createElement('li');
+            todoItem.className = `todo-item ${todo.completed ? 'completed' : ''}`;
+            todoItem.dataset.todoId = todo.id;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'todo-checkbox';
+            checkbox.checked = todo.completed;
+            checkbox.addEventListener('change', async () => {
+                await todoService.toggleTodoStatus(todo.id);
+                this.renderTodos(); // Re-render
+            });
+
+            const textSpan = document.createElement('span');
+            textSpan.className = 'todo-text';
+            textSpan.textContent = todo.text;
+            // Allow editing in the future
+            // textSpan.setAttribute('contenteditable', 'true');
+            // textSpan.addEventListener('blur', (e) => {
+            //    todoService.updateTodoText(todo.id, e.target.textContent);
+            // });
+
+
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-button';
+            deleteButton.innerHTML = '<i class="material-icons-round">delete</i>';
+            deleteButton.title = 'Delete Todo';
+            deleteButton.addEventListener('click', async () => {
+                await todoService.deleteTodo(todo.id);
+                this.renderTodos(); // Re-render
+            });
+            
+            todoItem.appendChild(checkbox);
+            todoItem.appendChild(textSpan);
+            todoItem.appendChild(deleteButton);
+            todoListElement.appendChild(todoItem);
+        });
+    }
+
     // Initialize UI components
     async initializeUI() {
         try {
@@ -201,6 +315,8 @@ class App {
             this.setupEventListeners();
             this.setupPanelInteractions();
             setupAffirmationActions();
+            this.renderNotes();
+            this.renderTodos();
         } catch (error) {
             console.error('UI initialization failed:', error);
             this.handleInitializationError(error);
@@ -229,6 +345,30 @@ class App {
             
             if (cleanup) this.cleanup.draggable.add(cleanup);
         });
+
+        const notesWidgetDraggable = document.getElementById('notes-widget');
+        if (notesWidgetDraggable) {
+            const cleanupNotes = makeDraggable(notesWidgetDraggable, {
+                handle: notesWidgetDraggable.querySelector('.widget-handle'),
+                // Optional: save position using stateManager
+                // onDragEnd: (e, position) => {
+                //     stateManager.updateSettings({ notesWidgetPosition: { top: `${position.y}px`, left: `${position.x}px` } });
+                // }
+            });
+            if (cleanupNotes) this.cleanup.draggable.add(cleanupNotes);
+        }
+    
+        const todoWidgetDraggable = document.getElementById('todo-widget');
+        if (todoWidgetDraggable) {
+            const cleanupTodo = makeDraggable(todoWidgetDraggable, {
+                handle: todoWidgetDraggable.querySelector('.widget-handle'),
+                // Optional: save position
+                // onDragEnd: (e, position) => {
+                //     stateManager.updateSettings({ todoWidgetPosition: { top: `${position.y}px`, left: `${position.x}px` } });
+                // }
+            });
+            if (cleanupTodo) this.cleanup.draggable.add(cleanupTodo);
+        }
     }
 
     // Initialize time updates
@@ -365,6 +505,52 @@ class App {
                 }
             });
         }
+
+        // Notes Widget
+        const saveNoteButton = document.getElementById('saveNoteButton');
+        const newNoteTextarea = document.getElementById('newNoteTextarea');
+        saveNoteButton?.addEventListener('click', async () => {
+            if (newNoteTextarea && newNoteTextarea.value.trim() !== '') {
+                await notesService.addNote(newNoteTextarea.value);
+                newNoteTextarea.value = ''; // Clear textarea
+                this.renderNotes(); // Re-render
+            }
+        });
+
+        // Todo List Widget
+        const addTodoButton = document.getElementById('addTodoButton');
+        const newTodoInput = document.getElementById('newTodoInput');
+        addTodoButton?.addEventListener('click', async () => {
+            if (newTodoInput && newTodoInput.value.trim() !== '') {
+                await todoService.addTodo(newTodoInput.value);
+                newTodoInput.value = ''; // Clear input
+                this.renderTodos(); // Re-render
+            }
+        });
+        newTodoInput?.addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter' && newTodoInput.value.trim() !== '') {
+                await todoService.addTodo(newTodoInput.value);
+                newTodoInput.value = ''; // Clear input
+                this.renderTodos(); // Re-render
+            }
+        });
+
+        // Menu Toggles for Widgets
+        const toggleNotesButton = document.getElementById('toggleNotesButton');
+        const notesWidget = document.getElementById('notes-widget');
+        toggleNotesButton?.addEventListener('click', () => {
+            notesWidget?.classList.toggle('hidden');
+            // Optionally, save visibility state to stateManager
+            // stateManager.updateSettings({ showNotesWidget: !notesWidget.classList.contains('hidden') });
+        });
+
+        const toggleTodoButton = document.getElementById('toggleTodoButton');
+        const todoWidget = document.getElementById('todo-widget');
+        toggleTodoButton?.addEventListener('click', () => {
+            todoWidget?.classList.toggle('hidden');
+            // Optionally, save visibility state to stateManager
+            // stateManager.updateSettings({ showTodoWidget: !todoWidget.classList.contains('hidden') });
+        });
     }
 
     // Setup panel interactions
