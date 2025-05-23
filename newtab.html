@@ -54,6 +54,10 @@
             <span>Show Clock</span>
             <input type="checkbox" id="showClock" checked />
           </label>
+          <label class="setting-item">
+            <span>Show Affirmation</span>
+            <input type="checkbox" id="showAffirmation" checked />
+          </label>
         </div>
 
         <div class="settings-group">
@@ -125,7 +129,7 @@
       </div>
 
       <!-- Time widget -->
-      <div class="time-widget glass draggable-widget">
+      <div id="time-widget" class="time-widget glass draggable-widget">
         <div class="widget-handle">⋮</div>
         <div class="time" id="time">00:00</div>
         <div class="date" id="date">Loading...</div>
@@ -142,7 +146,8 @@
       </button>
 
       <!-- Affirmation card -->
-      <div class="affirmation-card glass">
+      <div class="affirmation-card glass draggable-widget" id="affirmation-widget"> <!-- Added id and draggable-widget class -->
+        <div class="widget-handle">⋮</div> <!-- Added handle -->
         <p class="affirmation-text" id="affirmation">
           Loading your daily affirmation...
         </p>
@@ -217,20 +222,6 @@
             <li id="backgroundsButton">
               <i class="material-icons-round">photo_library</i>
               Saved Backgrounds
-            </li>
-          </ul>
-        </div>
-
-        <div class="menu-group">
-          <h4>Tools</h4>
-          <ul>
-            <li id="toggleNotesButton" class="menu-item">
-              <i class="material-icons-round">description</i>
-              Notes
-            </li>
-            <li id="toggleTodoButton" class="menu-item">
-              <i class="material-icons-round">checklist</i>
-              Todo List
             </li>
           </ul>
         </div>

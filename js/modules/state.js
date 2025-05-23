@@ -16,6 +16,7 @@ const defaultSettings = {
     weatherWidgetPosition: { top: '20px', left: 'auto', right: '20px' },
     fontStyle: 'default',
     textColor: '#FFFFFF',
+    showAffirmation: true, // Default to visible
     enableNotifications: false,
     subscriptionStatus: SUBSCRIPTION_STATUS.FREE,
     trialEndsAt: null,
@@ -31,6 +32,15 @@ const defaultSettings = {
         backgrounds: []
     },
     favoritesMetadata: {}, // Stores metadata for favorite affirmations
+        showNotes: true, // Renamed from showNotesWidget
+        showTodo: true,  // Renamed from showTodoWidget
+        widgetPositions: {
+            weather: null,
+            time: null,
+            notes: null,
+            todo: null,
+            affirmation: null // New entry for affirmation card
+        },
     statistics: {
         totalViews: 0,
         favorites: {},

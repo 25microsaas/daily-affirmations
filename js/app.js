@@ -309,6 +309,29 @@ class App {
     // Initialize UI components
     async initializeUI() {
         try {
+            const settings = stateManager.getSettings(); // Keep this for widgetPositions if needed elsewhere in initUI
+            
+            // Initial visibility for Notes & Todo is now handled in setupPanelInteractions
+            // where their respective checkboxes are initialized.
+
+            // Apply saved widget positions
+            const { widgetPositions } = settings;
+            if (widgetPositions) {
+                for (const widgetStorageId in widgetPositions) {
+                    const position = widgetPositions[widgetStorageId];
+                    if (position && typeof position.top === 'string' && typeof position.left === 'string') {
+                        const widgetElement = document.getElementById(`${widgetStorageId}-widget`);
+                        if (widgetElement) {
+                            widgetElement.style.top = position.top;
+                            widgetElement.style.left = position.left;
+                            // Ensure position is set to allow top/left to work. 
+                            // .draggable-widget should already handle this, but being explicit can be safer.
+                            widgetElement.style.position = 'fixed'; // Or 'absolute' if container is relative
+                        }
+                    }
+                }
+            }
+
             this.initializeDraggableWidgets();
             this.initializeTimeUpdate();
             await reminderSettings.initialize();
@@ -325,50 +348,47 @@ class App {
 
     // Initialize draggable widgets
     initializeDraggableWidgets() {
-        const widgets = document.querySelectorAll('.draggable-widget');
+        const widgetSelectors = ['#weather-widget', '#time-widget', '#notes-widget', '#todo-widget', '#affirmation-widget']; // Added affirmation-widget
         
-        widgets.forEach(widget => {
-            const cleanup = makeDraggable(widget, {
-                handle: widget.querySelector('.widget-handle'),
-                onDragEnd: (e, position) => {
-                    if (widget.id === 'weather-widget') {
-                        stateManager.updateSettings({
-                            weatherWidgetPosition: {
-                                top: `${position.y}px`,
-                                left: `${position.x}px`,
-                                right: 'auto'
+        widgetSelectors.forEach(selector => {
+            const widgetElement = document.querySelector(selector);
+            if (widgetElement && !widgetElement.classList.contains('hidden')) {
+                const handle = widgetElement.querySelector('.widget-handle');
+                if (handle) {
+                    const cleanup = makeDraggable(widgetElement, {
+                        handle: handle,
+                        onDragEnd: async (element, position) => {
+                            const widgetId = element.id;
+                            if (!widgetId) {
+                                console.warn('Draggable element is missing an ID:', element);
+                                return;
                             }
-                        });
-                    }
-                }
-            });
-            
-            if (cleanup) this.cleanup.draggable.add(cleanup);
-        });
+                            const storageId = widgetId.replace('-widget', ''); // E.g., 'weather' from 'weather-widget'
+                            
+                            // Ensure currentSettings is loaded before trying to get widgetPositions
+                            const currentSettings = stateManager.getSettings();
+                            const currentWidgetPositions = currentSettings.widgetPositions || {};
 
-        const notesWidgetDraggable = document.getElementById('notes-widget');
-        if (notesWidgetDraggable) {
-            const cleanupNotes = makeDraggable(notesWidgetDraggable, {
-                handle: notesWidgetDraggable.querySelector('.widget-handle'),
-                // Optional: save position using stateManager
-                // onDragEnd: (e, position) => {
-                //     stateManager.updateSettings({ notesWidgetPosition: { top: `${position.y}px`, left: `${position.x}px` } });
-                // }
-            });
-            if (cleanupNotes) this.cleanup.draggable.add(cleanupNotes);
-        }
-    
-        const todoWidgetDraggable = document.getElementById('todo-widget');
-        if (todoWidgetDraggable) {
-            const cleanupTodo = makeDraggable(todoWidgetDraggable, {
-                handle: todoWidgetDraggable.querySelector('.widget-handle'),
-                // Optional: save position
-                // onDragEnd: (e, position) => {
-                //     stateManager.updateSettings({ todoWidgetPosition: { top: `${position.y}px`, left: `${position.x}px` } });
-                // }
-            });
-            if (cleanupTodo) this.cleanup.draggable.add(cleanupTodo);
-        }
+                            await stateManager.updateSettings({
+                                widgetPositions: {
+                                    ...currentWidgetPositions,
+                                    [storageId]: { top: `${position.y}px`, left: `${position.x}px` }
+                                }
+                            });
+                        }
+                    });
+                    if (cleanup) this.cleanup.draggable.add(cleanup);
+                } else {
+                    console.warn(`No handle found for widget: ${selector}`);
+                }
+            } else if (widgetElement && widgetElement.classList.contains('hidden')) {
+                // console.log(`Widget ${selector} is hidden, not making draggable yet.`);
+                // Optionally, add logic here to re-initialize draggable if widget becomes visible.
+                // For now, we rely on page reload or manual re-init if visibility changes.
+            } else {
+                console.warn(`Widget not found: ${selector}`);
+            }
+        });
     }
 
     // Initialize time updates
@@ -535,22 +555,10 @@ class App {
             }
         });
 
-        // Menu Toggles for Widgets
-        const toggleNotesButton = document.getElementById('toggleNotesButton');
-        const notesWidget = document.getElementById('notes-widget');
-        toggleNotesButton?.addEventListener('click', () => {
-            notesWidget?.classList.toggle('hidden');
-            // Optionally, save visibility state to stateManager
-            // stateManager.updateSettings({ showNotesWidget: !notesWidget.classList.contains('hidden') });
-        });
-
-        const toggleTodoButton = document.getElementById('toggleTodoButton');
-        const todoWidget = document.getElementById('todo-widget');
-        toggleTodoButton?.addEventListener('click', () => {
-            todoWidget?.classList.toggle('hidden');
-            // Optionally, save visibility state to stateManager
-            // stateManager.updateSettings({ showTodoWidget: !todoWidget.classList.contains('hidden') });
-        });
+        // Old menu toggles for Notes and Todo have been removed from HTML,
+        // so their listeners (which were ID-based) are effectively removed
+        // by removing the elements themselves. No specific JS code removal
+        // is needed here for those ID-based listeners if the elements are gone.
     }
 
     // Setup panel interactions
@@ -577,6 +585,30 @@ class App {
         const settings = stateManager.getSettings();
         if (showWeatherCheckbox) showWeatherCheckbox.checked = settings.showWeather;
         if (showClockCheckbox) showClockCheckbox.checked = settings.showClock;
+        
+        const showAffirmationCheckbox = document.getElementById('showAffirmation');
+        const affirmationCard = document.querySelector('.affirmation-card');
+        if (showAffirmationCheckbox) {
+            showAffirmationCheckbox.checked = settings.showAffirmation;
+        }
+        affirmationCard?.classList.toggle('hidden', !settings.showAffirmation);
+
+        // Notes Toggle
+        const showNotesCheckbox = document.getElementById('showNotes');
+        const notesWidget = document.getElementById('notes-widget');
+        if (showNotesCheckbox) {
+            showNotesCheckbox.checked = settings.showNotes; // Use new setting key
+        }
+        notesWidget?.classList.toggle('hidden', !settings.showNotes); // Apply on load
+
+        // Todo List Toggle
+        const showTodoCheckbox = document.getElementById('showTodo');
+        const todoWidget = document.getElementById('todo-widget');
+        if (showTodoCheckbox) {
+            showTodoCheckbox.checked = settings.showTodo; // Use new setting key
+        }
+        todoWidget?.classList.toggle('hidden', !settings.showTodo); // Apply on load
+
         if (backgroundThemeSelect) backgroundThemeSelect.value = settings.backgroundTheme;
         if (cardStyleSelect) cardStyleSelect.value = settings.cardStyle;
         if (fontStyleSelect) fontStyleSelect.value = settings.fontStyle;
@@ -586,20 +618,40 @@ class App {
         this.applyThemeSettings(settings);
 
         // Add event listeners for settings changes
-        showWeatherCheckbox?.addEventListener('change', (e) => {
-            stateManager.updateSettings({ showWeather: e.target.checked });
-            const weatherWidget = document.querySelector('.weather');
-            if (weatherWidget) {
-                weatherWidget.style.display = e.target.checked ? 'block' : 'none';
-            }
+        // Weather Toggle
+        const weatherWidget = document.getElementById('weather-widget'); 
+        weatherWidget?.classList.toggle('hidden', !settings.showWeather); 
+
+        showWeatherCheckbox?.addEventListener('change', async (e) => {
+            await stateManager.updateSettings({ showWeather: e.target.checked });
+            weatherWidget?.classList.toggle('hidden', !e.target.checked);
         });
 
-        showClockCheckbox?.addEventListener('change', (e) => {
-            stateManager.updateSettings({ showClock: e.target.checked });
-            const timeWidget = document.querySelector('.time-widget');
-            if (timeWidget) {
-                timeWidget.style.display = e.target.checked ? 'block' : 'none';
-            }
+        // Clock Toggle
+        const timeWidget = document.querySelector('.time-widget'); 
+        timeWidget?.classList.toggle('hidden', !settings.showClock); 
+
+        showClockCheckbox?.addEventListener('change', async (e) => {
+            await stateManager.updateSettings({ showClock: e.target.checked });
+            timeWidget?.classList.toggle('hidden', !e.target.checked);
+        });
+
+        // Affirmation Toggle
+        showAffirmationCheckbox?.addEventListener('change', async (e) => {
+            await stateManager.updateSettings({ showAffirmation: e.target.checked });
+            affirmationCard?.classList.toggle('hidden', !e.target.checked);
+        });
+        
+        // Notes Toggle Event Listener
+        showNotesCheckbox?.addEventListener('change', async (e) => {
+            await stateManager.updateSettings({ showNotes: e.target.checked }); // Use new setting key
+            notesWidget?.classList.toggle('hidden', !e.target.checked);
+        });
+
+        // Todo List Toggle Event Listener
+        showTodoCheckbox?.addEventListener('change', async (e) => {
+            await stateManager.updateSettings({ showTodo: e.target.checked }); // Use new setting key
+            todoWidget?.classList.toggle('hidden', !e.target.checked);
         });
 
         backgroundThemeSelect?.addEventListener('change', async (e) => {
