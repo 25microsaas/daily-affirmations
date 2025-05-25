@@ -60,9 +60,10 @@
     
     /* Radius */
     --radius-lg: 20px;
-    --radius-md: 16px; /* Changed from radius-md to border-radius-medium for consistency with new CSS */
+    --radius-md: 16px; 
     --radius-sm: 12px;
-    --border-radius-medium: 12px; /* For consistency with new CSS */
+    --border-radius-medium: 12px; 
+    --border-radius-small: 8px; /* Added for consistency */
 }
 
 /* Global Styles */
@@ -2444,4 +2445,505 @@ body.font-monospace {
 /* Hidden class (if not already globally defined robustly) */
 .hidden {
     display: none !important;
+}
+
+/* Pomodoro Timer Widget Styles */
+#pomodoro-widget {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Center content horizontally */
+    text-align: center; /* Center text for children */
+    /* max-height: can be set if needed, but flex column should manage size */
+}
+
+#pomodoro-widget h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border);
+    width: 100%; /* Make border span full width of widget padding */
+}
+
+.pomodoro-state-display {
+    font-size: 1.1em;
+    color: var(--color-text-secondary);
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.pomodoro-timer-display {
+    font-size: 3em; /* Large timer text */
+    font-weight: bold;
+    color: var(--color-text-primary);
+    margin-bottom: 15px;
+    font-family: 'JetBrains Mono', 'Roboto Mono', monospace; /* Monospaced font for timer */
+}
+
+.pomodoro-controls {
+    display: flex;
+    justify-content: center; /* Center buttons */
+    gap: 10px; /* Space between buttons */
+    margin-bottom: 15px;
+    width: 100%; /* Ensure controls take full width for centering */
+}
+
+.pomodoro-button {
+    background-color: rgba(255, 255, 255, 0.15); /* Subtle background */
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--border-radius-medium);
+    padding: 8px 12px;
+    cursor: pointer;
+    display: inline-flex; /* Align icon and text */
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.pomodoro-button:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+    border-color: var(--color-border);
+}
+
+.pomodoro-button i.material-icons-round {
+    margin-right: 6px; /* Space between icon and text */
+    font-size: 18px; /* Icon size */
+}
+
+/* Specific button styling if Start/Pause changes text/icon */
+#pomodoroStartPause[data-action="start"] .material-icons-round { /* If icon changes */
+    /* content: 'play_arrow'; */
+}
+#pomodoroStartPause[data-action="pause"] .material-icons-round { /* If icon changes */
+    /* content: 'pause'; */
+}
+
+
+.pomodoro-cycle-display {
+    font-size: 0.9em;
+    color: var(--color-text-secondary);
+}
+
+/* Goal Tracker Widget Styles */
+#goal-tracker-widget {
+    display: flex;
+    flex-direction: column;
+    max-height: 400px; /* Consistent max height with other list-based widgets */
+}
+
+#goal-tracker-widget h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border);
+    width: 100%;
+    text-align: center; /* Center title */
+}
+
+.goal-input-container {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+#newGoalInput {
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-medium) 0 0 var(--border-radius-medium);
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-primary);
+}
+
+#addGoalButton.add-button { /* Shares style with Todo add button */
+    padding: 8px 12px;
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 0 var(--border-radius-medium) var(--border-radius-medium) 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+#addGoalButton.add-button i {
+    margin-right: 4px;
+}
+#addGoalButton.add-button:hover {
+    background-color: var(--accent-color-dark);
+}
+
+.goals-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 5px; /* For scrollbar spacing */
+}
+
+.goal-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-border-light);
+}
+.goal-item:last-child {
+    border-bottom: none;
+}
+
+.goal-checkbox { /* Shares style with todo-checkbox */
+    margin-right: 10px;
+    transform: scale(1.1);
+    accent-color: var(--accent-color);
+}
+
+.goal-text {
+    flex-grow: 1;
+    color: var(--color-text-primary);
+    word-break: break-word;
+    cursor: pointer; /* Indicate it's editable */
+    padding: 4px; /* Padding for when contenteditable is true */
+    border-radius: var(--border-radius-small);
+}
+
+.goal-text[contenteditable="true"] {
+    background-color: rgba(255, 255, 255, 0.15);
+    outline: 1px solid var(--color-accent);
+    cursor: text;
+}
+
+.goal-item.completed .goal-text {
+    text-decoration: line-through;
+    color: var(--color-text-secondary);
+}
+
+.delete-goal-button.small-icon-button { /* Shares structure with other delete buttons */
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    margin-left: auto; /* Pushes delete button to the far right */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+.delete-goal-button.small-icon-button:hover {
+    color: var(--color-danger);
+    background-color: rgba(255,255,255,0.1);
+}
+.delete-goal-button.small-icon-button i {
+    font-size: 18px;
+}
+
+/* Empty state for goals list if needed, can reuse .empty-state-message from notes/todo */
+/* .goals-list .empty-state-message { ... } */
+
+/* Habit Tracker Widget Styles */
+#habit-tracker-widget {
+    display: flex;
+    flex-direction: column;
+    max-height: 400px; /* Consistent max height */
+}
+
+#habit-tracker-widget h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border);
+    width: 100%;
+    text-align: center; /* Center title */
+}
+
+.habit-input-container { /* Shares style with goal-input-container */
+    display: flex;
+    margin-bottom: 10px;
+}
+
+#newHabitInput { /* Shares style with newGoalInput */
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-medium) 0 0 var(--border-radius-medium);
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-primary);
+}
+
+#addHabitButton.add-button { /* Shares style with other add buttons */
+    padding: 8px 12px;
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 0 var(--border-radius-medium) var(--border-radius-medium) 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+#addHabitButton.add-button i {
+    margin-right: 4px;
+}
+#addHabitButton.add-button:hover {
+    background-color: var(--accent-color-dark);
+}
+
+.habits-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 5px; /* For scrollbar spacing */
+}
+
+.habit-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 0; /* Slightly more padding for habits */
+    border-bottom: 1px solid var(--color-border-light);
+}
+.habit-item:last-child {
+    border-bottom: none;
+}
+
+.habit-text {
+    flex-grow: 1;
+    color: var(--color-text-primary);
+    word-break: break-word;
+    margin-left: 4px; /* Small space if "done" button is first */
+}
+
+.habit-done-button {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary); /* Default color for "not done" */
+    cursor: pointer;
+    padding: 4px;
+    margin-right: 8px; /* Space between done button and text if text is first */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--border-radius-small); /* Slight rounding for hover effect */
+}
+
+.habit-done-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.habit-done-button i.material-icons-round {
+    font-size: 22px; /* Slightly larger checkbox icons */
+}
+
+.habit-item.done-today .habit-text {
+    /* text-decoration: line-through; */ /* Optional: strikethrough for text */
+    color: var(--color-text-secondary); /* Faded color for text */
+}
+
+.habit-item.done-today .habit-done-button {
+    color: var(--accent-color); /* Accent color for "done" */
+}
+
+.delete-habit-button.small-icon-button { /* Shares style with goal delete button */
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    margin-left: auto; /* Pushes delete button to the far right */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+.delete-habit-button.small-icon-button:hover {
+    color: var(--color-danger);
+    background-color: rgba(255,255,255,0.1);
+}
+.delete-habit-button.small-icon-button i {
+    font-size: 18px;
+}
+
+/* Quick Links Widget Styles */
+#quick-links-widget {
+    display: flex;
+    flex-direction: column;
+    max-height: 400px; /* Consistent max height */
+}
+
+.quick-links-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+#quick-links-widget h3 { /* Already targeted by #quick-links-widget h3 in previous features, but this is more specific */
+    margin-top: 0;
+    margin-bottom: 0; /* Handled by header padding */
+}
+
+.add-link-button {
+    background: none;
+    border: none;
+    color: var(--color-text-primary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.add-link-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--color-accent);
+}
+.add-link-button i.material-icons-round {
+    font-size: 22px;
+}
+
+.quick-links-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); /* Responsive grid */
+    gap: 15px; /* Space between items */
+    overflow-y: auto;
+    flex-grow: 1;
+    padding: 5px; /* Padding around the grid */
+}
+
+.quick-link-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: var(--color-text-primary);
+    padding: 10px;
+    border-radius: var(--border-radius-medium);
+    background-color: rgba(255, 255, 255, 0.05); /* Subtle background for items */
+    transition: background-color 0.2s ease;
+    position: relative; /* For action buttons */
+    min-height: 80px; /* Ensure items have a decent height */
+}
+
+.quick-link-item:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.quick-link-icon {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 8px;
+    object-fit: contain; /* Ensure icon fits well */
+    border-radius: var(--border-radius-small); /* Optional: round favicons slightly */
+}
+
+.quick-link-title {
+    font-size: 0.85em;
+    text-align: center;
+    word-break: break-word;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; /* Keep title to one line, use ellipsis */
+}
+
+.quick-link-actions {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    display: none; /* Hidden by default, shown on hover of .quick-link-item */
+    background-color: rgba(0,0,0,0.3); /* Slight backdrop for buttons */
+    border-radius: var(--border-radius-small);
+    padding: 2px;
+}
+
+.quick-link-item:hover .quick-link-actions {
+    display: flex;
+    gap: 2px;
+}
+
+.quick-link-actions .small-icon-button { /* Reuses existing styles for delete buttons */
+    padding: 3px; /* Slightly smaller padding for these actions */
+    color: #fff; /* White icon on darkish backdrop */
+}
+.quick-link-actions .small-icon-button:hover {
+    background-color: rgba(255,255,255,0.2);
+    color: var(--color-accent);
+}
+.quick-link-actions .small-icon-button i.material-icons-round {
+    font-size: 16px; /* Smaller icons for edit/delete */
+}
+
+
+/* Add/Edit Link Modal Styles */
+.dialog-content.medium-dialog { /* Specific sizing for this modal */
+    max-width: 450px;
+}
+
+#linkForm .form-group {
+    margin-bottom: 15px;
+}
+
+#linkForm label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+    color: var(--color-text-secondary);
+}
+
+#linkForm input[type="url"],
+#linkForm input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-medium);
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-primary);
+    font-size: 1em;
+}
+
+#linkForm .icon-preview-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.quick-link-icon-preview {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--border-radius-small);
+    object-fit: contain;
+}
+
+#linkForm .dialog-actions { /* Shares style with other dialog actions */
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+#linkForm .form-button { /* Shares style with other form buttons */
+    padding: 10px 15px;
+    border: none;
+    border-radius: var(--border-radius-medium);
+    cursor: pointer;
+    font-weight: 500;
+}
+#linkForm .form-button.primary {
+    background-color: var(--accent-color);
+    color: white;
+}
+#linkForm .form-button.primary:hover {
+    background-color: var(--accent-color-dark);
+}
+#linkForm .form-button.secondary {
+    background-color: var(--color-background-secondary); /* Or similar */
+    color: var(--color-text-primary);
+}
+#linkForm .form-button.secondary:hover {
+    background-color: var(--color-border);
 }

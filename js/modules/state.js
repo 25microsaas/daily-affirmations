@@ -39,8 +39,26 @@ const defaultSettings = {
             time: null,
             notes: null,
             todo: null,
-            affirmation: null // New entry for affirmation card
+            affirmation: null, // New entry for affirmation card
+            pomodoro: null, // For Pomodoro widget position
+            goalTracker: null, // For Goal Tracker widget position
+            habitTracker: null, // For Habit Tracker widget position
+            quickLinks: null, // For Quick Links widget position
+            siteBlocker: null // For Site Blocker widget position
         },
+    showPomodoro: true, // For the display toggle in settings panel
+    showGoalTracker: true, // For Goal Tracker display toggle
+    showHabitTracker: true, // For Habit Tracker display toggle
+    showQuickLinks: true, // For Quick Links display toggle
+    showSiteBlocker: true, // For Site Blocker display toggle
+    siteBlockerEnabled: false, // Master toggle for the blocker service itself
+    pomodoro: { // Pomodoro specific settings
+        workDuration: 25 * 60,
+        shortBreakDuration: 5 * 60,
+        longBreakDuration: 15 * 60,
+        cyclesBeforeLongBreak: 4,
+        soundEnabled: true
+    },
     statistics: {
         totalViews: 0,
         favorites: {},

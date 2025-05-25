@@ -8,6 +8,11 @@ import customAffirmationsService from './services/customAffirmations.js';
 import dailyReminderService from './services/dailyReminder.js';
 import notesService from './services/notes.js';
 import todoService from './services/todo.js';
+import pomodoroService from './services/pomodoro.js';
+import goalsService from './services/goals.js';
+import habitsService from './services/habits.js';
+import quickLinksService from './services/quickLinks.js';
+import siteBlockerService from './services/siteBlocker.js';
 import reminderSettings from './components/reminder-settings.js';
 import { animations, makeDraggable, showNotification } from './utils/common.js';
 import { setupAffirmationActions } from './actions/affirmationActions.js';
@@ -63,7 +68,7 @@ class App {
     constructor() {
         this.initialized = false;
         this.cleanup = {
-            draggable: new Set(),
+            draggable: new Map(), // Changed from Set to Map
             animations: animations
         };
     }
@@ -80,7 +85,11 @@ class App {
             dailyReminder: false,
             backup: false,
             notes: false,
-            todo: false
+            todo: false,
+            pomodoro: false,
+            goalTracker: false,
+            quickLinks: false,
+            siteBlocker: false
         };
 
         try {
@@ -167,6 +176,58 @@ class App {
                         console.error('Todo service initialization failed:', error);
                         return false;
                     }),
+                
+                // Pomodoro service initialization
+                // Pass `this` (app instance) and `stateManager`
+                pomodoroService.initialize(this, stateManager)
+                    .then(() => serviceStatus.pomodoro = true)
+                    .catch(error => {
+                        console.error('Pomodoro service initialization failed:', error);
+                        return false;
+                    }),
+                
+                // Goal Tracker service initialization
+                goalsService.initialize()
+                    .then(() => {
+                        serviceStatus.goalTracker = true;
+                        // Initial render of goals after service is initialized
+                        if (typeof this.renderGoals === 'function') { 
+                            this.renderGoals();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Goal Tracker service initialization failed:', error);
+                        return false;
+                    }),
+                
+                // Quick Links service initialization
+                quickLinksService.initialize()
+                    .then(() => {
+                        serviceStatus.quickLinks = true;
+                        if (typeof this.renderQuickLinks === 'function') {
+                            this.renderQuickLinks();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Quick Links service initialization failed:', error);
+                        return false;
+                    }),
+                
+                // Site Blocker service initialization
+                siteBlockerService.initialize()
+                    .then(() => {
+                        serviceStatus.siteBlocker = true;
+                        // Initial render after service is initialized
+                        if (typeof this.renderSiteBlockerList === 'function') {
+                            this.renderSiteBlockerList();
+                        }
+                        // Initialize master toggle state in UI
+                        const masterToggle = document.getElementById('masterBlockerToggle');
+                        if (masterToggle) {
+                            masterToggle.checked = siteBlockerService.getBlockerEnabledStatus();
+                        }
+                    })
+                    .catch(error => console.error('Site Blocker service initialization failed:', error)),
             ]);
 
             // Update services that successfully initialized
@@ -340,6 +401,8 @@ class App {
             setupAffirmationActions();
             this.renderNotes();
             this.renderTodos();
+            this.renderGoals(); 
+            this.renderHabits(); // Call renderHabits here
         } catch (error) {
             console.error('UI initialization failed:', error);
             this.handleInitializationError(error);
@@ -348,47 +411,66 @@ class App {
 
     // Initialize draggable widgets
     initializeDraggableWidgets() {
-        const widgetSelectors = ['#weather-widget', '#time-widget', '#notes-widget', '#todo-widget', '#affirmation-widget']; // Added affirmation-widget
-        
+        // Ensure all potentially draggable widgets are processed on initial load
+        const widgetSelectors = ['#weather-widget', '#time-widget', '#notes-widget', '#todo-widget', '#affirmation-widget', '#pomodoro-widget', '#goal-tracker-widget', '#habit-tracker-widget', '#quick-links-widget', '#site-blocker-widget'];
         widgetSelectors.forEach(selector => {
-            const widgetElement = document.querySelector(selector);
-            if (widgetElement && !widgetElement.classList.contains('hidden')) {
-                const handle = widgetElement.querySelector('.widget-handle');
-                if (handle) {
-                    const cleanup = makeDraggable(widgetElement, {
-                        handle: handle,
-                        onDragEnd: async (element, position) => {
-                            const widgetId = element.id;
-                            if (!widgetId) {
-                                console.warn('Draggable element is missing an ID:', element);
-                                return;
-                            }
-                            const storageId = widgetId.replace('-widget', ''); // E.g., 'weather' from 'weather-widget'
-                            
-                            // Ensure currentSettings is loaded before trying to get widgetPositions
-                            const currentSettings = stateManager.getSettings();
-                            const currentWidgetPositions = currentSettings.widgetPositions || {};
+            // Extract ID from selector for makeWidgetDraggableById
+            const widgetId = selector.startsWith('#') ? selector.substring(1) : selector;
+            this.makeWidgetDraggableById(widgetId);
+        });
+    }
 
-                            await stateManager.updateSettings({
-                                widgetPositions: {
-                                    ...currentWidgetPositions,
-                                    [storageId]: { top: `${position.y}px`, left: `${position.x}px` }
-                                }
-                            });
+    // Helper to make a single widget draggable by its ID
+    makeWidgetDraggableById(widgetId) {
+        const widgetElement = document.getElementById(widgetId);
+
+        if (widgetElement && !widgetElement.classList.contains('hidden')) {
+            // Check if already has a cleanup function to prevent duplicates
+            if (this.cleanup.draggable.has(widgetId)) {
+                // Potentially remove old one if re-initializing, though makeDraggable might handle this
+                // this.cleanup.draggable.get(widgetId)(); 
+                // this.cleanup.draggable.delete(widgetId);
+                return; // Already draggable or re-initialization logic needs care
+            }
+
+            const handle = widgetElement.querySelector('.widget-handle');
+            if (!handle) {
+                console.warn(`No handle found for widget: ${widgetId}`);
+                return;
+            }
+
+            const cleanupFunc = makeDraggable(widgetElement, {
+                handle: handle,
+                onDragEnd: async (element, position) => {
+                    const currentWidgetId = element.id; // Should be the same as widgetId
+                    const storageId = currentWidgetId.replace('-widget', '');
+                    
+                    // Ensure currentSettings is loaded before trying to get widgetPositions
+                    const currentSettings = stateManager.getSettings();
+                    const currentWidgetPositions = currentSettings.widgetPositions || {};
+
+                    await stateManager.updateSettings({
+                        widgetPositions: {
+                            ...currentWidgetPositions,
+                            [storageId]: { top: `${position.y}px`, left: `${position.x}px` }
                         }
                     });
-                    if (cleanup) this.cleanup.draggable.add(cleanup);
-                } else {
-                    console.warn(`No handle found for widget: ${selector}`);
                 }
-            } else if (widgetElement && widgetElement.classList.contains('hidden')) {
-                // console.log(`Widget ${selector} is hidden, not making draggable yet.`);
-                // Optionally, add logic here to re-initialize draggable if widget becomes visible.
-                // For now, we rely on page reload or manual re-init if visibility changes.
-            } else {
-                console.warn(`Widget not found: ${selector}`);
+            });
+
+            if (cleanupFunc) {
+                this.cleanup.draggable.set(widgetId, cleanupFunc); // Store cleanup by ID
             }
-        });
+        } else if (widgetElement && widgetElement.classList.contains('hidden')) {
+            // If widget is hidden, ensure any previous draggable cleanup is called and removed
+            if (this.cleanup.draggable.has(widgetId)) {
+                const cleanupFunc = this.cleanup.draggable.get(widgetId);
+                if (cleanupFunc) cleanupFunc();
+                this.cleanup.draggable.delete(widgetId);
+            }
+        } else {
+            // console.warn(`Widget not found or explicitly not made draggable: ${widgetId}`);
+        }
     }
 
     // Initialize time updates
@@ -559,6 +641,65 @@ class App {
         // so their listeners (which were ID-based) are effectively removed
         // by removing the elements themselves. No specific JS code removal
         // is needed here for those ID-based listeners if the elements are gone.
+
+        // Pomodoro Controls
+        document.getElementById('pomodoroStartPause')?.addEventListener('click', () => {
+            pomodoroService.startPause();
+        });
+        document.getElementById('pomodoroReset')?.addEventListener('click', () => {
+            pomodoroService.reset();
+        });
+        document.getElementById('pomodoroSkip')?.addEventListener('click', () => {
+            pomodoroService.skip();
+        });
+
+        // Goal Tracker Controls
+        const newGoalInput = document.getElementById('newGoalInput');
+        const addGoalButton = document.getElementById('addGoalButton');
+
+        const addNewGoal = async () => {
+            if (newGoalInput && newGoalInput.value.trim() !== '') {
+                await goalsService.addGoal(newGoalInput.value.trim());
+                newGoalInput.value = ''; // Clear input
+                // 'this' context is implicitly correct here if setupEventListeners is a class method
+                // and renderGoals is also a class method.
+                this.renderGoals(); // Re-render 
+            }
+        };
+
+        addGoalButton?.addEventListener('click', addNewGoal);
+        newGoalInput?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addNewGoal();
+            }
+        });
+
+        // Quick Links Modal & Form Event Listeners
+        document.getElementById('showAddLinkModalButton')?.addEventListener('click', () => this.openLinkModal());
+        document.getElementById('closeLinkModalButton')?.addEventListener('click', () => this.closeLinkModal());
+        document.getElementById('cancelLinkModalButton')?.addEventListener('click', () => this.closeLinkModal());
+        
+        document.getElementById('linkUrlInput')?.addEventListener('input', () => this.handleLinkUrlInputChange());
+
+        document.getElementById('linkForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('linkIdInput').value;
+            const title = document.getElementById('linkTitleInput').value;
+            const url = document.getElementById('linkUrlInput').value;
+
+            if (!title.trim() || !url.trim()) {
+                showNotification('Error', 'Title and URL are required.'); // Using existing showNotification
+                return;
+            }
+
+            if (id) { // Editing existing link
+                await quickLinksService.updateLink({ id, title, url });
+            } else { // Adding new link
+                await quickLinksService.addLink({ title, url });
+            }
+            this.renderQuickLinks();
+            this.closeLinkModal();
+        });
     }
 
     // Setup panel interactions
@@ -609,6 +750,15 @@ class App {
         }
         todoWidget?.classList.toggle('hidden', !settings.showTodo); // Apply on load
 
+        // Pomodoro Timer Toggle
+        const showPomodoroCheckbox = document.getElementById('showPomodoro');
+        const pomodoroWidgetElement = document.getElementById('pomodoro-widget');
+        if (showPomodoroCheckbox) {
+            showPomodoroCheckbox.checked = settings.showPomodoro;
+        }
+        pomodoroWidgetElement?.classList.toggle('hidden', !settings.showPomodoro);
+
+
         if (backgroundThemeSelect) backgroundThemeSelect.value = settings.backgroundTheme;
         if (cardStyleSelect) cardStyleSelect.value = settings.cardStyle;
         if (fontStyleSelect) fontStyleSelect.value = settings.fontStyle;
@@ -616,6 +766,37 @@ class App {
 
         // Apply initial styles
         this.applyThemeSettings(settings);
+
+        // Initialize Pomodoro settings inputs
+        const pomodoroSettings = pomodoroService.getSettings(); // Get current pomodoro settings
+        const workDurationInput = document.getElementById('pomodoroWorkDuration');
+        const shortBreakDurationInput = document.getElementById('pomodoroShortBreakDuration');
+        const longBreakDurationInput = document.getElementById('pomodoroLongBreakDuration');
+        const cyclesInput = document.getElementById('pomodoroCycles');
+        const soundEnabledCheckbox = document.getElementById('pomodoroSoundEnabled');
+
+        if (workDurationInput) workDurationInput.value = pomodoroSettings.workDuration / 60;
+        if (shortBreakDurationInput) shortBreakDurationInput.value = pomodoroSettings.shortBreakDuration / 60;
+        if (longBreakDurationInput) longBreakDurationInput.value = pomodoroSettings.longBreakDuration / 60;
+        if (cyclesInput) cyclesInput.value = pomodoroSettings.cyclesBeforeLongBreak;
+        if (soundEnabledCheckbox) soundEnabledCheckbox.checked = pomodoroSettings.soundEnabled;
+
+        // Add event listeners for Pomodoro settings changes
+        workDurationInput?.addEventListener('change', (e) => {
+            pomodoroService.updateSettings({ workDuration: parseInt(e.target.value) * 60 });
+        });
+        shortBreakDurationInput?.addEventListener('change', (e) => {
+            pomodoroService.updateSettings({ shortBreakDuration: parseInt(e.target.value) * 60 });
+        });
+        longBreakDurationInput?.addEventListener('change', (e) => {
+            pomodoroService.updateSettings({ longBreakDuration: parseInt(e.target.value) * 60 });
+        });
+        cyclesInput?.addEventListener('change', (e) => {
+            pomodoroService.updateSettings({ cyclesBeforeLongBreak: parseInt(e.target.value) });
+        });
+        soundEnabledCheckbox?.addEventListener('change', (e) => {
+            pomodoroService.updateSettings({ soundEnabled: e.target.checked });
+        });
 
         // Add event listeners for settings changes
         // Weather Toggle
@@ -652,8 +833,63 @@ class App {
         showTodoCheckbox?.addEventListener('change', async (e) => {
             await stateManager.updateSettings({ showTodo: e.target.checked }); // Use new setting key
             todoWidget?.classList.toggle('hidden', !e.target.checked);
+            if (e.target.checked) this.makeWidgetDraggableById('todo-widget');
         });
 
+        // Pomodoro Timer Toggle Event Listener
+        showPomodoroCheckbox?.addEventListener('change', async (e) => {
+            await stateManager.updateSettings({ showPomodoro: e.target.checked });
+            pomodoroWidgetElement?.classList.toggle('hidden', !e.target.checked);
+            if (e.target.checked && pomodoroWidgetElement) {
+                this.makeWidgetDraggableById('pomodoro-widget');
+            }
+        });
+
+        // Goal Tracker Toggle Event Listener
+        const showGoalTrackerCheckbox = document.getElementById('showGoalTracker');
+        const goalTrackerWidgetElement = document.getElementById('goal-tracker-widget');
+        // Initial state application is already handled earlier in setupPanelInteractions
+        showGoalTrackerCheckbox?.addEventListener('change', async (e) => {
+            await stateManager.updateSettings({ showGoalTracker: e.target.checked });
+            goalTrackerWidgetElement?.classList.toggle('hidden', !e.target.checked);
+            if (e.target.checked && goalTrackerWidgetElement) {
+                this.makeWidgetDraggableById('goal-tracker-widget');
+                if (typeof this.renderGoals === 'function') { // Re-render if becoming visible
+                    this.renderGoals();
+                }
+            }
+        });
+
+        // Quick Links Toggle Event Listener
+        const showQuickLinksCheckbox = document.getElementById('showQuickLinks');
+        const quickLinksWidgetElement = document.getElementById('quick-links-widget');
+        // Initial state application is handled earlier in setupPanelInteractions
+        showQuickLinksCheckbox?.addEventListener('change', async (e) => {
+            await stateManager.updateSettings({ showQuickLinks: e.target.checked });
+            quickLinksWidgetElement?.classList.toggle('hidden', !e.target.checked);
+            if (e.target.checked && quickLinksWidgetElement) {
+                this.makeWidgetDraggableById('quick-links-widget');
+                if (typeof this.renderQuickLinks === 'function') {
+                    this.renderQuickLinks();
+                }
+            }
+        });
+
+        // Site Blocker Toggle Event Listener
+        const showSiteBlockerCheckbox = document.getElementById('showSiteBlocker');
+        const siteBlockerWidgetElement = document.getElementById('site-blocker-widget');
+        // Initial state application is handled earlier in setupPanelInteractions
+        showSiteBlockerCheckbox?.addEventListener('change', async (e) => {
+            await stateManager.updateSettings({ showSiteBlocker: e.target.checked });
+            siteBlockerWidgetElement?.classList.toggle('hidden', !e.target.checked);
+            if (e.target.checked && siteBlockerWidgetElement) {
+                this.makeWidgetDraggableById('site-blocker-widget');
+                if (typeof this.renderSiteBlockerList === 'function') { // Re-render if becoming visible
+                    this.renderSiteBlockerList();
+                }
+            }
+        });
+        
         backgroundThemeSelect?.addEventListener('change', async (e) => {
             const newTheme = e.target.value;
             await stateManager.updateSettings({ backgroundTheme: newTheme });
@@ -717,6 +953,1168 @@ class App {
                 menuPanel.classList.add('hidden');
             }
         });
+    }
+
+    // Render Goals
+    async renderGoals() {
+        if (!goalsService) return; // Guard if service not ready
+
+        const goals = goalsService.getGoals();
+        const goalsListContainer = document.getElementById('goalsListContainer');
+        if (!goalsListContainer) return;
+
+        goalsListContainer.innerHTML = ''; // Clear existing goals
+
+        if (goals.length === 0) {
+            goalsListContainer.innerHTML = '<li class="empty-state-message">No goals yet. Add one above!</li>';
+            return;
+        }
+
+        goals.forEach(goal => {
+            const goalItem = document.createElement('li');
+            goalItem.className = `goal-item ${goal.completed ? 'completed' : ''}`;
+            goalItem.dataset.goalId = goal.id;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'goal-checkbox';
+            checkbox.checked = goal.completed;
+            checkbox.addEventListener('change', async () => {
+                await goalsService.toggleGoalCompletion(goal.id);
+                this.renderGoals(); // Re-render the list
+            });
+
+            const textSpan = document.createElement('span');
+            textSpan.className = 'goal-text';
+            textSpan.textContent = goal.text;
+            textSpan.setAttribute('contenteditable', 'false'); // Initially not editable
+
+            textSpan.addEventListener('dblclick', () => { // Double click to edit
+                textSpan.setAttribute('contenteditable', 'true');
+                textSpan.focus();
+            });
+
+            textSpan.addEventListener('blur', async () => { // Save on blur
+                textSpan.setAttribute('contenteditable', 'false');
+                const newText = textSpan.textContent.trim();
+                if (newText && newText !== goal.text) {
+                    await goalsService.updateGoalText(goal.id, newText);
+                    // No re-render needed if only text changed and visual is updated directly
+                } else {
+                    textSpan.textContent = goal.text; // Revert if empty or unchanged
+                }
+            });
+            
+            textSpan.addEventListener('keydown', async (e) => { // Save on Enter
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent newline in contenteditable
+                    textSpan.blur(); // Trigger blur to save
+                } else if (e.key === 'Escape') {
+                     textSpan.textContent = goal.text; // Revert changes
+                     textSpan.blur();
+                }
+            });
+
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-goal-button small-icon-button';
+            deleteButton.innerHTML = '<i class="material-icons-round">delete</i>';
+            deleteButton.title = 'Delete Goal';
+            deleteButton.addEventListener('click', async () => {
+                await goalsService.deleteGoal(goal.id);
+                this.renderGoals(); // Re-render
+            });
+            
+            goalItem.appendChild(checkbox);
+            goalItem.appendChild(textSpan);
+            goalItem.appendChild(deleteButton);
+            goalsListContainer.appendChild(goalItem);
+        });
+    }
+
+    // Render Quick Links
+    async renderQuickLinks() {
+        if (!quickLinksService) return;
+        const links = quickLinksService.getLinks();
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+
+        gridContainer.innerHTML = ''; // Clear existing links
+
+        if (links.length === 0) {
+            gridContainer.innerHTML = '<p class="empty-state-message">No links yet. Click the + button to add one!</p>';
+            return;
+        }
+
+        links.forEach(link => {
+            const linkItem = document.createElement('a');
+            linkItem.href = link.url;
+            linkItem.target = '_blank';
+            linkItem.className = 'quick-link-item';
+            linkItem.dataset.linkId = link.id;
+            linkItem.setAttribute('draggable', 'true'); // For reordering
+
+            const icon = document.createElement('img');
+            icon.src = link.iconUrl || 'images/icon-32.png'; // Fallback icon
+            icon.alt = ''; // Decorative
+            icon.className = 'quick-link-icon';
+            icon.onerror = () => { icon.src = 'images/icon-32.png'; }; // Handle broken icon links
+
+            const title = document.createElement('span');
+            title.className = 'quick-link-title';
+            title.textContent = link.title;
+
+            const actions = document.createElement('div');
+            actions.className = 'quick-link-actions';
+            
+            const editButton = document.createElement('button');
+            editButton.className = 'edit-link-button small-icon-button';
+            editButton.title = 'Edit link';
+            editButton.innerHTML = '<i class="material-icons-round">edit</i>';
+            editButton.addEventListener('click', (e) => {
+                e.preventDefault(); e.stopPropagation(); this.openLinkModal(link);
+            });
+
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-link-button small-icon-button';
+            deleteButton.title = 'Delete link';
+            deleteButton.innerHTML = '<i class="material-icons-round">delete_outline</i>';
+            deleteButton.addEventListener('click', async (e) => {
+                e.preventDefault(); e.stopPropagation();
+                // Consider using a custom confirmation dialog here instead of confirm() for better UX
+                if (confirm(`Delete "${link.title}"?`)) { 
+                    await quickLinksService.deleteLink(link.id);
+                    this.renderQuickLinks();
+                }
+            });
+
+            actions.appendChild(editButton);
+            actions.appendChild(deleteButton);
+            linkItem.appendChild(icon);
+            linkItem.appendChild(title);
+            linkItem.appendChild(actions);
+            gridContainer.appendChild(linkItem);
+        });
+        this.setupLinkDragAndDrop(); // Call D&D setup after rendering
+    }
+
+    // --- Quick Links Modal Logic ---
+    openLinkModal(linkToEdit = null) {
+        const modal = document.getElementById('addEditLinkModal');
+        const form = document.getElementById('linkForm');
+        const modalTitle = document.getElementById('linkModalTitle');
+        const linkIdInput = document.getElementById('linkIdInput');
+        const linkUrlInput = document.getElementById('linkUrlInput');
+        const linkTitleInput = document.getElementById('linkTitleInput');
+        const iconPreview = document.getElementById('linkIconPreview');
+
+        form.reset(); // Clear previous entries
+        if (linkToEdit) {
+            modalTitle.textContent = 'Edit Link';
+            linkIdInput.value = linkToEdit.id;
+            linkUrlInput.value = linkToEdit.url;
+            linkTitleInput.value = linkToEdit.title;
+            iconPreview.src = linkToEdit.iconUrl || 'images/icon-32.png';
+        } else {
+            modalTitle.textContent = 'Add New Link';
+            linkIdInput.value = ''; // Important for differentiating add vs edit
+            linkUrlInput.value = ''; // Clear URL for new link
+            linkTitleInput.value = ''; // Clear title for new link
+            iconPreview.src = 'images/icon-32.png'; // Default preview
+        }
+        modal?.classList.remove('hidden');
+    }
+
+    closeLinkModal() {
+        document.getElementById('addEditLinkModal')?.classList.add('hidden');
+    }
+    
+    // Helper for URL input change to update icon preview and suggest title
+    handleLinkUrlInputChange() {
+        const linkUrlInput = document.getElementById('linkUrlInput');
+        const linkTitleInput = document.getElementById('linkTitleInput');
+        const iconPreview = document.getElementById('linkIconPreview');
+        
+        const url = linkUrlInput.value.trim();
+        if (url) {
+            let prefixedUrl = url;
+            if (!prefixedUrl.startsWith('http://') && !prefixedUrl.startsWith('https://')) {
+                prefixedUrl = 'https://' + prefixedUrl;
+            }
+            iconPreview.src = quickLinksService.getFaviconUrl(prefixedUrl);
+            iconPreview.onerror = () => { iconPreview.src = 'images/icon-32.png'; }; // Fallback on error
+            
+            // Suggest title only if title input is empty and it's a new link
+            if (!document.getElementById('linkIdInput').value && !linkTitleInput.value) {
+                linkTitleInput.value = quickLinksService.suggestTitleFromUrl(prefixedUrl);
+            }
+        } else {
+            iconPreview.src = 'images/icon-32.png';
+        }
+    }
+    // --- End Quick Links Modal Logic ---
+
+    // --- Quick Links Drag and Drop Logic ---
+    setupLinkDragAndDrop() {
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+        let draggedItem = null;
+
+        gridContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('quick-link-item')) {
+                draggedItem = e.target;
+                setTimeout(() => e.target.classList.add('dragging'), 0); // For visual feedback
+            }
+        });
+
+        gridContainer.addEventListener('dragend', (e) => {
+            if (draggedItem && e.target.classList.contains('quick-link-item')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+                
+                // Get new order of IDs
+                const newOrderIds = [];
+                gridContainer.querySelectorAll('.quick-link-item').forEach(item => {
+                    newOrderIds.push(item.dataset.linkId);
+                });
+                quickLinksService.reorderLinks(newOrderIds);
+                // No re-render needed if visual order is already correct by DOM manipulation
+            }
+        });
+
+        gridContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            const afterElement = this.getDragAfterElement(gridContainer, e.clientX, e.clientY); // Use clientX/Y for grid
+            if (draggedItem) {
+                if (afterElement == null) {
+                    gridContainer.appendChild(draggedItem);
+                } else {
+                    gridContainer.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    }
+    
+    // Helper for dragover (adjust for grid if needed)
+    getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.quick-link-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          // For grid, check both X and Y. This is a simplified version.
+          const offsetY = y - box.top - box.height / 2;
+          const offsetX = x - box.left - box.width / 2; 
+
+          // This heuristic attempts to find the element that the dragged item should come "before".
+          // It prioritizes elements that are "below" the cursor's Y position first.
+          // If multiple elements are below, it prefers the one whose vertical center is closer.
+          // If the cursor's Y is within an element's vertical bounds, it then considers horizontal position.
+          
+          if (offsetY < 0 && offsetY > closest.offsetY) { // Cursor is above the center of 'child', and 'child' is closer than previous 'closest'
+              return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && closest.offsetY < 0) { // Current 'child' is below cursor, but previous 'closest' was above. This 'child' is a better candidate.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && offsetY < closest.offsetY) { // Both 'child' and 'closest' are below cursor, 'child' is closer.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (Math.abs(offsetY) < box.height / 2 ) { // Cursor is vertically within the bounds of 'child' (roughly same row)
+              if (offsetX < 0 && offsetX > closest.offsetX && closest.offsetY !== Number.NEGATIVE_INFINITY && Math.abs(closest.offsetY) > box.height / 2) {
+                 // If previous closest was far vertically, prefer this one even if offsetX is slightly worse, as long as it's to the left.
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              } else if (offsetX < 0 && offsetX > closest.offsetX && Math.abs(offsetY) <= Math.abs(closest.offsetY)) { // And cursor is to the left of 'child's center, and 'child' is closer or equally close horizontally
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              }
+          }
+          return closest;
+      }, { offsetY: Number.NEGATIVE_INFINITY, offsetX: Number.NEGATIVE_INFINITY }).element;
+    }
+    // --- End Quick Links Drag and Drop Logic ---
+
+    // --- Quick Links Drag and Drop Logic ---
+    setupLinkDragAndDrop() {
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+        let draggedItem = null;
+
+        gridContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('quick-link-item')) {
+                draggedItem = e.target;
+                setTimeout(() => e.target.classList.add('dragging'), 0); // For visual feedback
+            }
+        });
+
+        gridContainer.addEventListener('dragend', (e) => {
+            if (draggedItem && e.target.classList.contains('quick-link-item')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+                
+                // Get new order of IDs
+                const newOrderIds = [];
+                gridContainer.querySelectorAll('.quick-link-item').forEach(item => {
+                    newOrderIds.push(item.dataset.linkId);
+                });
+                quickLinksService.reorderLinks(newOrderIds);
+                // No re-render needed if visual order is already correct by DOM manipulation
+            }
+        });
+
+        gridContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            const afterElement = this.getDragAfterElement(gridContainer, e.clientX, e.clientY); // Use clientX/Y for grid
+            if (draggedItem) {
+                if (afterElement == null) {
+                    gridContainer.appendChild(draggedItem);
+                } else {
+                    gridContainer.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    }
+    
+    // Helper for dragover (adjust for grid if needed)
+    getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.quick-link-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          // For grid, check both X and Y. This is a simplified version.
+          const offsetY = y - box.top - box.height / 2;
+          const offsetX = x - box.left - box.width / 2; 
+
+          // This heuristic attempts to find the element that the dragged item should come "before".
+          // It prioritizes elements that are "below" the cursor's Y position first.
+          // If multiple elements are below, it prefers the one whose vertical center is closer.
+          // If the cursor's Y is within an element's vertical bounds, it then considers horizontal position.
+          
+          if (offsetY < 0 && offsetY > closest.offsetY) { // Cursor is above the center of 'child', and 'child' is closer than previous 'closest'
+              return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && closest.offsetY < 0) { // Current 'child' is below cursor, but previous 'closest' was above. This 'child' is a better candidate.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && offsetY < closest.offsetY) { // Both 'child' and 'closest' are below cursor, 'child' is closer.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (Math.abs(offsetY) < box.height / 2 ) { // Cursor is vertically within the bounds of 'child' (roughly same row)
+              if (offsetX < 0 && offsetX > closest.offsetX && closest.offsetY !== Number.NEGATIVE_INFINITY && Math.abs(closest.offsetY) > box.height / 2) {
+                 // If previous closest was far vertically, prefer this one even if offsetX is slightly worse, as long as it's to the left.
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              } else if (offsetX < 0 && offsetX > closest.offsetX && Math.abs(offsetY) <= Math.abs(closest.offsetY)) { // And cursor is to the left of 'child's center, and 'child' is closer or equally close horizontally
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              }
+          }
+          return closest;
+      }, { offsetY: Number.NEGATIVE_INFINITY, offsetX: Number.NEGATIVE_INFINITY }).element;
+    }
+    // --- End Quick Links Drag and Drop Logic ---
+
+    // --- Quick Links Drag and Drop Logic ---
+    setupLinkDragAndDrop() {
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+        let draggedItem = null;
+
+        gridContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('quick-link-item')) {
+                draggedItem = e.target;
+                setTimeout(() => e.target.classList.add('dragging'), 0); // For visual feedback
+            }
+        });
+
+        gridContainer.addEventListener('dragend', (e) => {
+            if (draggedItem && e.target.classList.contains('quick-link-item')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+                
+                // Get new order of IDs
+                const newOrderIds = [];
+                gridContainer.querySelectorAll('.quick-link-item').forEach(item => {
+                    newOrderIds.push(item.dataset.linkId);
+                });
+                quickLinksService.reorderLinks(newOrderIds);
+                // No re-render needed if visual order is already correct by DOM manipulation
+            }
+        });
+
+        gridContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            const afterElement = this.getDragAfterElement(gridContainer, e.clientX, e.clientY); // Use clientX/Y for grid
+            if (draggedItem) {
+                if (afterElement == null) {
+                    gridContainer.appendChild(draggedItem);
+                } else {
+                    gridContainer.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    }
+    
+    // Helper for dragover (adjust for grid if needed)
+    getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.quick-link-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          // For grid, check both X and Y. This is a simplified version.
+          const offsetY = y - box.top - box.height / 2;
+          const offsetX = x - box.left - box.width / 2; 
+
+          // This heuristic attempts to find the element that the dragged item should come "before".
+          // It prioritizes elements that are "below" the cursor's Y position first.
+          // If multiple elements are below, it prefers the one whose vertical center is closer.
+          // If the cursor's Y is within an element's vertical bounds, it then considers horizontal position.
+          
+          if (offsetY < 0 && offsetY > closest.offsetY) { // Cursor is above the center of 'child', and 'child' is closer than previous 'closest'
+              return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && closest.offsetY < 0) { // Current 'child' is below cursor, but previous 'closest' was above. This 'child' is a better candidate.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && offsetY < closest.offsetY) { // Both 'child' and 'closest' are below cursor, 'child' is closer.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (Math.abs(offsetY) < box.height / 2 ) { // Cursor is vertically within the bounds of 'child' (roughly same row)
+              if (offsetX < 0 && offsetX > closest.offsetX && closest.offsetY !== Number.NEGATIVE_INFINITY && Math.abs(closest.offsetY) > box.height / 2) {
+                 // If previous closest was far vertically, prefer this one even if offsetX is slightly worse, as long as it's to the left.
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              } else if (offsetX < 0 && offsetX > closest.offsetX && Math.abs(offsetY) <= Math.abs(closest.offsetY)) { // And cursor is to the left of 'child's center, and 'child' is closer or equally close horizontally
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              }
+          }
+          return closest;
+      }, { offsetY: Number.NEGATIVE_INFINITY, offsetX: Number.NEGATIVE_INFINITY }).element;
+    }
+    // --- End Quick Links Drag and Drop Logic ---
+
+    // --- Quick Links Drag and Drop Logic ---
+    setupLinkDragAndDrop() {
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+        let draggedItem = null;
+
+        gridContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('quick-link-item')) {
+                draggedItem = e.target;
+                setTimeout(() => e.target.classList.add('dragging'), 0); // For visual feedback
+            }
+        });
+
+        gridContainer.addEventListener('dragend', (e) => {
+            if (draggedItem && e.target.classList.contains('quick-link-item')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+                
+                // Get new order of IDs
+                const newOrderIds = [];
+                gridContainer.querySelectorAll('.quick-link-item').forEach(item => {
+                    newOrderIds.push(item.dataset.linkId);
+                });
+                quickLinksService.reorderLinks(newOrderIds);
+                // No re-render needed if visual order is already correct by DOM manipulation
+            }
+        });
+
+        gridContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            const afterElement = this.getDragAfterElement(gridContainer, e.clientX, e.clientY); // Use clientX/Y for grid
+            if (draggedItem) {
+                if (afterElement == null) {
+                    gridContainer.appendChild(draggedItem);
+                } else {
+                    gridContainer.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    }
+    
+    // Helper for dragover (adjust for grid if needed)
+    getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.quick-link-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          // For grid, check both X and Y. This is a simplified version.
+          const offsetY = y - box.top - box.height / 2;
+          const offsetX = x - box.left - box.width / 2; 
+
+          // This heuristic attempts to find the element that the dragged item should come "before".
+          // It prioritizes elements that are "below" the cursor's Y position first.
+          // If multiple elements are below, it prefers the one whose vertical center is closer.
+          // If the cursor's Y is within an element's vertical bounds, it then considers horizontal position.
+          
+          if (offsetY < 0 && offsetY > closest.offsetY) { // Cursor is above the center of 'child', and 'child' is closer than previous 'closest'
+              return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && closest.offsetY < 0) { // Current 'child' is below cursor, but previous 'closest' was above. This 'child' is a better candidate.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && offsetY < closest.offsetY) { // Both 'child' and 'closest' are below cursor, 'child' is closer.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (Math.abs(offsetY) < box.height / 2 ) { // Cursor is vertically within the bounds of 'child' (roughly same row)
+              if (offsetX < 0 && offsetX > closest.offsetX && closest.offsetY !== Number.NEGATIVE_INFINITY && Math.abs(closest.offsetY) > box.height / 2) {
+                 // If previous closest was far vertically, prefer this one even if offsetX is slightly worse, as long as it's to the left.
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              } else if (offsetX < 0 && offsetX > closest.offsetX && Math.abs(offsetY) <= Math.abs(closest.offsetY)) { // And cursor is to the left of 'child's center, and 'child' is closer or equally close horizontally
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              }
+          }
+          return closest;
+      }, { offsetY: Number.NEGATIVE_INFINITY, offsetX: Number.NEGATIVE_INFINITY }).element;
+    }
+    // --- End Quick Links Drag and Drop Logic ---
+
+    // --- Quick Links Drag and Drop Logic ---
+    setupLinkDragAndDrop() {
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+        let draggedItem = null;
+
+        gridContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('quick-link-item')) {
+                draggedItem = e.target;
+                setTimeout(() => e.target.classList.add('dragging'), 0); // For visual feedback
+            }
+        });
+
+        gridContainer.addEventListener('dragend', (e) => {
+            if (draggedItem && e.target.classList.contains('quick-link-item')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+                
+                // Get new order of IDs
+                const newOrderIds = [];
+                gridContainer.querySelectorAll('.quick-link-item').forEach(item => {
+                    newOrderIds.push(item.dataset.linkId);
+                });
+                quickLinksService.reorderLinks(newOrderIds);
+                // No re-render needed if visual order is already correct by DOM manipulation
+            }
+        });
+
+        gridContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            const afterElement = this.getDragAfterElement(gridContainer, e.clientX, e.clientY); // Use clientX/Y for grid
+            if (draggedItem) {
+                if (afterElement == null) {
+                    gridContainer.appendChild(draggedItem);
+                } else {
+                    gridContainer.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    }
+    
+    // Helper for dragover (adjust for grid if needed)
+    getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.quick-link-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          // For grid, check both X and Y. This is a simplified version.
+          const offsetY = y - box.top - box.height / 2;
+          const offsetX = x - box.left - box.width / 2; 
+
+          // This heuristic attempts to find the element that the dragged item should come "before".
+          // It prioritizes elements that are "below" the cursor's Y position first.
+          // If multiple elements are below, it prefers the one whose vertical center is closer.
+          // If the cursor's Y is within an element's vertical bounds, it then considers horizontal position.
+          
+          if (offsetY < 0 && offsetY > closest.offsetY) { // Cursor is above the center of 'child', and 'child' is closer than previous 'closest'
+              return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && closest.offsetY < 0) { // Current 'child' is below cursor, but previous 'closest' was above. This 'child' is a better candidate.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && offsetY < closest.offsetY) { // Both 'child' and 'closest' are below cursor, 'child' is closer.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (Math.abs(offsetY) < box.height / 2 ) { // Cursor is vertically within the bounds of 'child' (roughly same row)
+              if (offsetX < 0 && offsetX > closest.offsetX && closest.offsetY !== Number.NEGATIVE_INFINITY && Math.abs(closest.offsetY) > box.height / 2) {
+                 // If previous closest was far vertically, prefer this one even if offsetX is slightly worse, as long as it's to the left.
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              } else if (offsetX < 0 && offsetX > closest.offsetX && Math.abs(offsetY) <= Math.abs(closest.offsetY)) { // And cursor is to the left of 'child's center, and 'child' is closer or equally close horizontally
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              }
+          }
+          return closest;
+      }, { offsetY: Number.NEGATIVE_INFINITY, offsetX: Number.NEGATIVE_INFINITY }).element;
+    }
+    // --- End Quick Links Drag and Drop Logic ---
+
+    // --- Quick Links Drag and Drop Logic ---
+    setupLinkDragAndDrop() {
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+        let draggedItem = null;
+
+        gridContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('quick-link-item')) {
+                draggedItem = e.target;
+                setTimeout(() => e.target.classList.add('dragging'), 0); // For visual feedback
+            }
+        });
+
+        gridContainer.addEventListener('dragend', (e) => {
+            if (draggedItem && e.target.classList.contains('quick-link-item')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+                
+                // Get new order of IDs
+                const newOrderIds = [];
+                gridContainer.querySelectorAll('.quick-link-item').forEach(item => {
+                    newOrderIds.push(item.dataset.linkId);
+                });
+                quickLinksService.reorderLinks(newOrderIds);
+                // No re-render needed if visual order is already correct by DOM manipulation
+            }
+        });
+
+        gridContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            const afterElement = this.getDragAfterElement(gridContainer, e.clientX, e.clientY); // Use clientX/Y for grid
+            if (draggedItem) {
+                if (afterElement == null) {
+                    gridContainer.appendChild(draggedItem);
+                } else {
+                    gridContainer.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    }
+    
+    // Helper for dragover (adjust for grid if needed)
+    getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.quick-link-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          // For grid, check both X and Y. This is a simplified version.
+          const offsetY = y - box.top - box.height / 2;
+          const offsetX = x - box.left - box.width / 2; 
+
+          // This heuristic attempts to find the element that the dragged item should come "before".
+          // It prioritizes elements that are "below" the cursor's Y position first.
+          // If multiple elements are below, it prefers the one whose vertical center is closer.
+          // If the cursor's Y is within an element's vertical bounds, it then considers horizontal position.
+          
+          if (offsetY < 0 && offsetY > closest.offsetY) { // Cursor is above the center of 'child', and 'child' is closer than previous 'closest'
+              return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && closest.offsetY < 0) { // Current 'child' is below cursor, but previous 'closest' was above. This 'child' is a better candidate.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && offsetY < closest.offsetY) { // Both 'child' and 'closest' are below cursor, 'child' is closer.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (Math.abs(offsetY) < box.height / 2 ) { // Cursor is vertically within the bounds of 'child' (roughly same row)
+              if (offsetX < 0 && offsetX > closest.offsetX && closest.offsetY !== Number.NEGATIVE_INFINITY && Math.abs(closest.offsetY) > box.height / 2) {
+                 // If previous closest was far vertically, prefer this one even if offsetX is slightly worse, as long as it's to the left.
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              } else if (offsetX < 0 && offsetX > closest.offsetX && Math.abs(offsetY) <= Math.abs(closest.offsetY)) { // And cursor is to the left of 'child's center, and 'child' is closer or equally close horizontally
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              }
+          }
+          return closest;
+      }, { offsetY: Number.NEGATIVE_INFINITY, offsetX: Number.NEGATIVE_INFINITY }).element;
+    }
+    // --- End Quick Links Drag and Drop Logic ---
+
+    // --- Quick Links Drag and Drop Logic ---
+    setupLinkDragAndDrop() {
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+        let draggedItem = null;
+
+        gridContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('quick-link-item')) {
+                draggedItem = e.target;
+                setTimeout(() => e.target.classList.add('dragging'), 0); // For visual feedback
+            }
+        });
+
+        gridContainer.addEventListener('dragend', (e) => {
+            if (draggedItem && e.target.classList.contains('quick-link-item')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+                
+                // Get new order of IDs
+                const newOrderIds = [];
+                gridContainer.querySelectorAll('.quick-link-item').forEach(item => {
+                    newOrderIds.push(item.dataset.linkId);
+                });
+                quickLinksService.reorderLinks(newOrderIds);
+                // No re-render needed if visual order is already correct by DOM manipulation
+            }
+        });
+
+        gridContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            const afterElement = this.getDragAfterElement(gridContainer, e.clientX, e.clientY); // Use clientX/Y for grid
+            if (draggedItem) {
+                if (afterElement == null) {
+                    gridContainer.appendChild(draggedItem);
+                } else {
+                    gridContainer.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    }
+    
+    // Helper for dragover (adjust for grid if needed)
+    getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.quick-link-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          // For grid, check both X and Y. This is a simplified version.
+          const offsetY = y - box.top - box.height / 2;
+          const offsetX = x - box.left - box.width / 2; 
+
+          // This heuristic attempts to find the element that the dragged item should come "before".
+          // It prioritizes elements that are "below" the cursor's Y position first.
+          // If multiple elements are below, it prefers the one whose vertical center is closer.
+          // If the cursor's Y is within an element's vertical bounds, it then considers horizontal position.
+          
+          if (offsetY < 0 && offsetY > closest.offsetY) { // Cursor is above the center of 'child', and 'child' is closer than previous 'closest'
+              return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && closest.offsetY < 0) { // Current 'child' is below cursor, but previous 'closest' was above. This 'child' is a better candidate.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && offsetY < closest.offsetY) { // Both 'child' and 'closest' are below cursor, 'child' is closer.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (Math.abs(offsetY) < box.height / 2 ) { // Cursor is vertically within the bounds of 'child' (roughly same row)
+              if (offsetX < 0 && offsetX > closest.offsetX && closest.offsetY !== Number.NEGATIVE_INFINITY && Math.abs(closest.offsetY) > box.height / 2) {
+                 // If previous closest was far vertically, prefer this one even if offsetX is slightly worse, as long as it's to the left.
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              } else if (offsetX < 0 && offsetX > closest.offsetX && Math.abs(offsetY) <= Math.abs(closest.offsetY)) { // And cursor is to the left of 'child's center, and 'child' is closer or equally close horizontally
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              }
+          }
+          return closest;
+      }, { offsetY: Number.NEGATIVE_INFINITY, offsetX: Number.NEGATIVE_INFINITY }).element;
+    }
+    // --- End Quick Links Drag and Drop Logic ---
+
+    // --- Quick Links Drag and Drop Logic ---
+    setupLinkDragAndDrop() {
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+        let draggedItem = null;
+
+        gridContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('quick-link-item')) {
+                draggedItem = e.target;
+                setTimeout(() => e.target.classList.add('dragging'), 0); // For visual feedback
+            }
+        });
+
+        gridContainer.addEventListener('dragend', (e) => {
+            if (draggedItem && e.target.classList.contains('quick-link-item')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+                
+                // Get new order of IDs
+                const newOrderIds = [];
+                gridContainer.querySelectorAll('.quick-link-item').forEach(item => {
+                    newOrderIds.push(item.dataset.linkId);
+                });
+                quickLinksService.reorderLinks(newOrderIds);
+                // No re-render needed if visual order is already correct by DOM manipulation
+            }
+        });
+
+        gridContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            const afterElement = this.getDragAfterElement(gridContainer, e.clientX, e.clientY); // Use clientX/Y for grid
+            if (draggedItem) {
+                if (afterElement == null) {
+                    gridContainer.appendChild(draggedItem);
+                } else {
+                    gridContainer.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    }
+    
+    // Helper for dragover (adjust for grid if needed)
+    getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.quick-link-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          // For grid, check both X and Y. This is a simplified version.
+          const offsetY = y - box.top - box.height / 2;
+          const offsetX = x - box.left - box.width / 2; 
+
+          // This heuristic attempts to find the element that the dragged item should come "before".
+          // It prioritizes elements that are "below" the cursor's Y position first.
+          // If multiple elements are below, it prefers the one whose vertical center is closer.
+          // If the cursor's Y is within an element's vertical bounds, it then considers horizontal position.
+          
+          if (offsetY < 0 && offsetY > closest.offsetY) { // Cursor is above the center of 'child', and 'child' is closer than previous 'closest'
+              return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && closest.offsetY < 0) { // Current 'child' is below cursor, but previous 'closest' was above. This 'child' is a better candidate.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && offsetY < closest.offsetY) { // Both 'child' and 'closest' are below cursor, 'child' is closer.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (Math.abs(offsetY) < box.height / 2 ) { // Cursor is vertically within the bounds of 'child' (roughly same row)
+              if (offsetX < 0 && offsetX > closest.offsetX && closest.offsetY !== Number.NEGATIVE_INFINITY && Math.abs(closest.offsetY) > box.height / 2) {
+                 // If previous closest was far vertically, prefer this one even if offsetX is slightly worse, as long as it's to the left.
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              } else if (offsetX < 0 && offsetX > closest.offsetX && Math.abs(offsetY) <= Math.abs(closest.offsetY)) { // And cursor is to the left of 'child's center, and 'child' is closer or equally close horizontally
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              }
+          }
+          return closest;
+      }, { offsetY: Number.NEGATIVE_INFINITY, offsetX: Number.NEGATIVE_INFINITY }).element;
+    }
+    // --- End Quick Links Drag and Drop Logic ---
+
+    // --- Quick Links Drag and Drop Logic ---
+    setupLinkDragAndDrop() {
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+        let draggedItem = null;
+
+        gridContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('quick-link-item')) {
+                draggedItem = e.target;
+                setTimeout(() => e.target.classList.add('dragging'), 0); // For visual feedback
+            }
+        });
+
+        gridContainer.addEventListener('dragend', (e) => {
+            if (draggedItem && e.target.classList.contains('quick-link-item')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+                
+                // Get new order of IDs
+                const newOrderIds = [];
+                gridContainer.querySelectorAll('.quick-link-item').forEach(item => {
+                    newOrderIds.push(item.dataset.linkId);
+                });
+                quickLinksService.reorderLinks(newOrderIds);
+                // No re-render needed if visual order is already correct by DOM manipulation
+            }
+        });
+
+        gridContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            const afterElement = this.getDragAfterElement(gridContainer, e.clientX, e.clientY); // Use clientX/Y for grid
+            if (draggedItem) {
+                if (afterElement == null) {
+                    gridContainer.appendChild(draggedItem);
+                } else {
+                    gridContainer.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    }
+    
+    // Helper for dragover (adjust for grid if needed)
+    getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.quick-link-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          // For grid, check both X and Y. This is a simplified version.
+          const offsetY = y - box.top - box.height / 2;
+          const offsetX = x - box.left - box.width / 2; 
+
+          // This heuristic attempts to find the element that the dragged item should come "before".
+          // It prioritizes elements that are "below" the cursor's Y position first.
+          // If multiple elements are below, it prefers the one whose vertical center is closer.
+          // If the cursor's Y is within an element's vertical bounds, it then considers horizontal position.
+          
+          if (offsetY < 0 && offsetY > closest.offsetY) { // Cursor is above the center of 'child', and 'child' is closer than previous 'closest'
+              return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && closest.offsetY < 0) { // Current 'child' is below cursor, but previous 'closest' was above. This 'child' is a better candidate.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && offsetY < closest.offsetY) { // Both 'child' and 'closest' are below cursor, 'child' is closer.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (Math.abs(offsetY) < box.height / 2 ) { // Cursor is vertically within the bounds of 'child' (roughly same row)
+              if (offsetX < 0 && offsetX > closest.offsetX && closest.offsetY !== Number.NEGATIVE_INFINITY && Math.abs(closest.offsetY) > box.height / 2) {
+                 // If previous closest was far vertically, prefer this one even if offsetX is slightly worse, as long as it's to the left.
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              } else if (offsetX < 0 && offsetX > closest.offsetX && Math.abs(offsetY) <= Math.abs(closest.offsetY)) { // And cursor is to the left of 'child's center, and 'child' is closer or equally close horizontally
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              }
+          }
+          return closest;
+      }, { offsetY: Number.NEGATIVE_INFINITY, offsetX: Number.NEGATIVE_INFINITY }).element;
+    }
+    // --- End Quick Links Drag and Drop Logic ---
+
+    // --- Quick Links Drag and Drop Logic ---
+    setupLinkDragAndDrop() {
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+        let draggedItem = null;
+
+        gridContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('quick-link-item')) {
+                draggedItem = e.target;
+                setTimeout(() => e.target.classList.add('dragging'), 0); // For visual feedback
+            }
+        });
+
+        gridContainer.addEventListener('dragend', (e) => {
+            if (draggedItem && e.target.classList.contains('quick-link-item')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+                
+                // Get new order of IDs
+                const newOrderIds = [];
+                gridContainer.querySelectorAll('.quick-link-item').forEach(item => {
+                    newOrderIds.push(item.dataset.linkId);
+                });
+                quickLinksService.reorderLinks(newOrderIds);
+                // No re-render needed if visual order is already correct by DOM manipulation
+            }
+        });
+
+        gridContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            const afterElement = this.getDragAfterElement(gridContainer, e.clientX, e.clientY); // Use clientX/Y for grid
+            if (draggedItem) {
+                if (afterElement == null) {
+                    gridContainer.appendChild(draggedItem);
+                } else {
+                    gridContainer.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    }
+    
+    // Helper for dragover (adjust for grid if needed)
+    getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.quick-link-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          // For grid, check both X and Y. This is a simplified version.
+          const offsetY = y - box.top - box.height / 2;
+          const offsetX = x - box.left - box.width / 2; 
+
+          // This heuristic attempts to find the element that the dragged item should come "before".
+          // It prioritizes elements that are "below" the cursor's Y position first.
+          // If multiple elements are below, it prefers the one whose vertical center is closer.
+          // If the cursor's Y is within an element's vertical bounds, it then considers horizontal position.
+          
+          if (offsetY < 0 && offsetY > closest.offsetY) { // Cursor is above the center of 'child', and 'child' is closer than previous 'closest'
+              return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && closest.offsetY < 0) { // Current 'child' is below cursor, but previous 'closest' was above. This 'child' is a better candidate.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && offsetY < closest.offsetY) { // Both 'child' and 'closest' are below cursor, 'child' is closer.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (Math.abs(offsetY) < box.height / 2 ) { // Cursor is vertically within the bounds of 'child' (roughly same row)
+              if (offsetX < 0 && offsetX > closest.offsetX && closest.offsetY !== Number.NEGATIVE_INFINITY && Math.abs(closest.offsetY) > box.height / 2) {
+                 // If previous closest was far vertically, prefer this one even if offsetX is slightly worse, as long as it's to the left.
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              } else if (offsetX < 0 && offsetX > closest.offsetX && Math.abs(offsetY) <= Math.abs(closest.offsetY)) { // And cursor is to the left of 'child's center, and 'child' is closer or equally close horizontally
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              }
+          }
+          return closest;
+      }, { offsetY: Number.NEGATIVE_INFINITY, offsetX: Number.NEGATIVE_INFINITY }).element;
+    }
+    // --- End Quick Links Drag and Drop Logic ---
+
+    // --- Quick Links Drag and Drop Logic ---
+    setupLinkDragAndDrop() {
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+        let draggedItem = null;
+
+        gridContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('quick-link-item')) {
+                draggedItem = e.target;
+                setTimeout(() => e.target.classList.add('dragging'), 0); // For visual feedback
+            }
+        });
+
+        gridContainer.addEventListener('dragend', (e) => {
+            if (draggedItem && e.target.classList.contains('quick-link-item')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+                
+                // Get new order of IDs
+                const newOrderIds = [];
+                gridContainer.querySelectorAll('.quick-link-item').forEach(item => {
+                    newOrderIds.push(item.dataset.linkId);
+                });
+                quickLinksService.reorderLinks(newOrderIds);
+                // No re-render needed if visual order is already correct by DOM manipulation
+            }
+        });
+
+        gridContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            const afterElement = this.getDragAfterElement(gridContainer, e.clientX, e.clientY); // Use clientX/Y for grid
+            if (draggedItem) {
+                if (afterElement == null) {
+                    gridContainer.appendChild(draggedItem);
+                } else {
+                    gridContainer.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    }
+    
+    // Helper for dragover (adjust for grid if needed)
+    getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.quick-link-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          // For grid, check both X and Y. This is a simplified version.
+          const offsetY = y - box.top - box.height / 2;
+          const offsetX = x - box.left - box.width / 2; 
+
+          // This heuristic attempts to find the element that the dragged item should come "before".
+          // It prioritizes elements that are "below" the cursor's Y position first.
+          // If multiple elements are below, it prefers the one whose vertical center is closer.
+          // If the cursor's Y is within an element's vertical bounds, it then considers horizontal position.
+          
+          if (offsetY < 0 && offsetY > closest.offsetY) { // Cursor is above the center of 'child', and 'child' is closer than previous 'closest'
+              return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && closest.offsetY < 0) { // Current 'child' is below cursor, but previous 'closest' was above. This 'child' is a better candidate.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && offsetY < closest.offsetY) { // Both 'child' and 'closest' are below cursor, 'child' is closer.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (Math.abs(offsetY) < box.height / 2 ) { // Cursor is vertically within the bounds of 'child' (roughly same row)
+              if (offsetX < 0 && offsetX > closest.offsetX && closest.offsetY !== Number.NEGATIVE_INFINITY && Math.abs(closest.offsetY) > box.height / 2) {
+                 // If previous closest was far vertically, prefer this one even if offsetX is slightly worse, as long as it's to the left.
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              } else if (offsetX < 0 && offsetX > closest.offsetX && Math.abs(offsetY) <= Math.abs(closest.offsetY)) { // And cursor is to the left of 'child's center, and 'child' is closer or equally close horizontally
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              }
+          }
+          return closest;
+      }, { offsetY: Number.NEGATIVE_INFINITY, offsetX: Number.NEGATIVE_INFINITY }).element;
+    }
+    // --- End Quick Links Drag and Drop Logic ---
+
+    // --- Quick Links Drag and Drop Logic ---
+    setupLinkDragAndDrop() {
+        const gridContainer = document.getElementById('quickLinksGridContainer');
+        if (!gridContainer) return;
+        let draggedItem = null;
+
+        gridContainer.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('quick-link-item')) {
+                draggedItem = e.target;
+                setTimeout(() => e.target.classList.add('dragging'), 0); // For visual feedback
+            }
+        });
+
+        gridContainer.addEventListener('dragend', (e) => {
+            if (draggedItem && e.target.classList.contains('quick-link-item')) {
+                e.target.classList.remove('dragging');
+                draggedItem = null;
+                
+                // Get new order of IDs
+                const newOrderIds = [];
+                gridContainer.querySelectorAll('.quick-link-item').forEach(item => {
+                    newOrderIds.push(item.dataset.linkId);
+                });
+                quickLinksService.reorderLinks(newOrderIds);
+                // No re-render needed if visual order is already correct by DOM manipulation
+            }
+        });
+
+        gridContainer.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            const afterElement = this.getDragAfterElement(gridContainer, e.clientX, e.clientY); // Use clientX/Y for grid
+            if (draggedItem) {
+                if (afterElement == null) {
+                    gridContainer.appendChild(draggedItem);
+                } else {
+                    gridContainer.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+    }
+    
+    // Helper for dragover (adjust for grid if needed)
+    getDragAfterElement(container, x, y) {
+      const draggableElements = [...container.querySelectorAll('.quick-link-item:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          // For grid, check both X and Y. This is a simplified version.
+          const offsetY = y - box.top - box.height / 2;
+          const offsetX = x - box.left - box.width / 2; 
+
+          // This heuristic attempts to find the element that the dragged item should come "before".
+          // It prioritizes elements that are "below" the cursor's Y position first.
+          // If multiple elements are below, it prefers the one whose vertical center is closer.
+          // If the cursor's Y is within an element's vertical bounds, it then considers horizontal position.
+          
+          if (offsetY < 0 && offsetY > closest.offsetY) { // Cursor is above the center of 'child', and 'child' is closer than previous 'closest'
+              return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && closest.offsetY < 0) { // Current 'child' is below cursor, but previous 'closest' was above. This 'child' is a better candidate.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (offsetY > 0 && offsetY < closest.offsetY) { // Both 'child' and 'closest' are below cursor, 'child' is closer.
+               return { offsetY: offsetY, offsetX: offsetX, element: child };
+          } else if (Math.abs(offsetY) < box.height / 2 ) { // Cursor is vertically within the bounds of 'child' (roughly same row)
+              if (offsetX < 0 && offsetX > closest.offsetX && closest.offsetY !== Number.NEGATIVE_INFINITY && Math.abs(closest.offsetY) > box.height / 2) {
+                 // If previous closest was far vertically, prefer this one even if offsetX is slightly worse, as long as it's to the left.
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              } else if (offsetX < 0 && offsetX > closest.offsetX && Math.abs(offsetY) <= Math.abs(closest.offsetY)) { // And cursor is to the left of 'child's center, and 'child' is closer or equally close horizontally
+                 return { offsetY: offsetY, offsetX: offsetX, element: child };
+              }
+          }
+          return closest;
+      }, { offsetY: Number.NEGATIVE_INFINITY, offsetX: Number.NEGATIVE_INFINITY }).element;
+    }
+    // --- End Quick Links Drag and Drop Logic ---
+
+    // Render Site Blocker List
+    async renderSiteBlockerList() {
+        if (!siteBlockerService) return;
+        const hostnames = siteBlockerService.getBlockedHostnames();
+        const listContainer = document.getElementById('blockedSitesListContainer');
+        if (!listContainer) return;
+
+        listContainer.innerHTML = ''; // Clear existing list
+
+        if (hostnames.length === 0) {
+            listContainer.innerHTML = '<li class="empty-state-message">No sites blocked yet.</li>';
+            return;
+        }
+
+        hostnames.forEach(hostname => {
+            const listItem = document.createElement('li');
+            listItem.className = 'blocked-site-item';
+            listItem.dataset.hostname = hostname;
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'blocked-site-hostname';
+            nameSpan.textContent = hostname;
+
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-blocked-site-button small-icon-button';
+            deleteButton.innerHTML = '<i class="material-icons-round">remove_circle_outline</i>';
+            deleteButton.title = `Remove ${hostname}`;
+            deleteButton.addEventListener('click', async () => {
+                await siteBlockerService.removeBlockedHostname(hostname);
+                this.renderSiteBlockerList(); 
+            });
+            
+            listItem.appendChild(nameSpan);
+            listItem.appendChild(deleteButton);
+            listContainer.appendChild(listItem);
+        });
+    }
+
+    // Update Pomodoro UI (called by pomodoro.js)
+    updatePomodoroUI({ mode, time, cycle, isRunning, cyclesBeforeLongBreak }) {
+        const stateDisplay = document.getElementById('pomodoroStateDisplay');
+        const timerDisplay = document.getElementById('pomodoroTimerDisplay');
+        const startPauseButton = document.getElementById('pomodoroStartPause');
+        const cycleDisplay = document.getElementById('pomodoroCycleDisplay');
+
+        if (stateDisplay) {
+            let modeText = 'Work';
+            if (mode === 'shortBreak') modeText = 'Short Break';
+            else if (mode === 'longBreak') modeText = 'Long Break';
+            stateDisplay.textContent = modeText;
+        }
+        if (timerDisplay) {
+            const minutes = Math.floor(time / 60);
+            const seconds = time % 60;
+            timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+        if (startPauseButton) {
+            // const icon = startPauseButton.querySelector('i'); // Icon is part of innerHTML
+            if (isRunning) {
+                startPauseButton.dataset.action = 'pause';
+                startPauseButton.innerHTML = '<i class="material-icons-round">pause</i> Pause';
+            } else {
+                startPauseButton.dataset.action = 'start';
+                startPauseButton.innerHTML = '<i class="material-icons-round">play_arrow</i> Start';
+            }
+        }
+        if (cycleDisplay) {
+            if (mode === 'work') {
+              cycleDisplay.textContent = `Cycle ${cycle} of ${cyclesBeforeLongBreak}`;
+              cycleDisplay.style.display = '';
+            } else {
+              cycleDisplay.style.display = 'none';
+            }
+        }
     }
 
     // Apply theme settings
@@ -822,7 +2220,7 @@ class App {
     cleanup() {
         // Clean up draggable widgets
         if (this.cleanup && this.cleanup.draggable) {
-            this.cleanup.draggable.forEach(cleanup => cleanup());
+            this.cleanup.draggable.forEach(cleanupFunc => cleanupFunc()); // Iterate over Map values
             this.cleanup.draggable.clear();
         }
 

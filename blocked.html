@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Blocked</title>
+    <style>
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f0f2f5; color: #333; text-align: center; }
+        .container { padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { color: #d93025; }
+        p { font-size: 1.1em; }
+        a { color: #1a73e8; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Site Blocked</h1>
+        <p>The website you are trying to access has been blocked by the extension.</p>
+        <p><a href="#" id="goBackLink">Go back</a> or close this tab.</p>
+    </div>
+    <script>
+        // Allow the user to go back if possible
+        document.getElementById('goBackLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            if (history.length > 1) {
+                history.back();
+            } else {
+                // If no history, provide a message or disable link, 
+                // or attempt to redirect to newtab, though that might be confusing.
+                // For now, it just won't do anything if history.length <= 1
+            }
+        });
+    </script>
+</body>
+</html>

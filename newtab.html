@@ -58,6 +58,26 @@
             <span>Show Affirmation</span>
             <input type="checkbox" id="showAffirmation" checked />
           </label>
+          <label class="setting-item">
+            <span>Show Focus Timer</span>
+            <input type="checkbox" id="showPomodoro" /> <!-- Default to checked via JS -->
+          </label>
+          <label class="setting-item">
+              <span>Show Goal Tracker</span>
+              <input type="checkbox" id="showGoalTracker" /> <!-- Default to checked via JS -->
+          </label>
+          <label class="setting-item">
+              <span>Show Habit Tracker</span>
+              <input type="checkbox" id="showHabitTracker" /> <!-- Default to checked via JS -->
+          </label>
+          <label class="setting-item">
+              <span>Show Quick Links</span>
+              <input type="checkbox" id="showQuickLinks" /> <!-- Default to checked via JS -->
+          </label>
+          <label class="setting-item">
+              <span>Show Site Blocker</span>
+              <input type="checkbox" id="showSiteBlocker" /> <!-- Default to checked via JS -->
+          </label>
         </div>
 
         <div class="settings-group">
@@ -96,6 +116,30 @@
         <button id="resetSettings" class="reset-button">
           Reset to Defaults
         </button>
+
+        <div class="settings-group">
+          <h4>Focus Timer Settings</h4>
+          <label class="setting-item">
+              <span>Work Duration (min)</span>
+              <input type="number" id="pomodoroWorkDuration" min="1" />
+          </label>
+          <label class="setting-item">
+              <span>Short Break (min)</span>
+              <input type="number" id="pomodoroShortBreakDuration" min="1" />
+          </label>
+          <label class="setting-item">
+              <span>Long Break (min)</span>
+              <input type="number" id="pomodoroLongBreakDuration" min="1" />
+          </label>
+          <label class="setting-item">
+              <span>Cycles before Long Break</span>
+              <input type="number" id="pomodoroCycles" min="1" />
+          </label>
+          <label class="setting-item">
+              <span>Enable Sound Notifications</span>
+              <input type="checkbox" id="pomodoroSoundEnabled" />
+          </label>
+        </div>
       </div>
 
       <!-- Weather widget -->
@@ -460,6 +504,180 @@
         </div>
         <ul class="todo-list">
             <!-- Todo items will be dynamically populated here -->
+        </ul>
+    </div>
+
+    <!-- Pomodoro Timer Widget -->
+    <div id="pomodoro-widget" class="draggable-widget glass hidden">
+        <div class="widget-handle">⋮</div>
+        <h3>Focus Timer</h3>
+        <div class="pomodoro-state-display" id="pomodoroStateDisplay">Work</div>
+        <div class="pomodoro-timer-display" id="pomodoroTimerDisplay">25:00</div>
+        <div class="pomodoro-controls">
+            <button id="pomodoroStartPause" class="pomodoro-button" data-action="start">
+                <i class="material-icons-round">play_arrow</i> Start
+            </button>
+            <button id="pomodoroReset" class="pomodoro-button" data-action="reset">
+                <i class="material-icons-round">replay</i> Reset
+            </button>
+            <button id="pomodoroSkip" class="pomodoro-button" data-action="skip">
+                <i class="material-icons-round">skip_next</i> Skip
+            </button>
+        </div>
+        <div class="pomodoro-cycle-display" id="pomodoroCycleDisplay">Cycle 1 of 4</div>
+    </div>
+
+    <!-- Goal Tracker Widget -->
+    <div id="goal-tracker-widget" class="draggable-widget glass hidden">
+        <div class="widget-handle">⋮</div>
+        <h3>My Goals</h3>
+        <div class="goal-input-container">
+            <input type="text" id="newGoalInput" placeholder="Add a new goal...">
+            <button id="addGoalButton" class="add-button">
+                <i class="material-icons-round">add</i> Add
+            </button>
+        </div>
+        <ul class="goals-list" id="goalsListContainer">
+            <!-- Goal items will be dynamically populated here -->
+            <!-- Example Goal Item:
+            <li class="goal-item" data-goal-id="1">
+                <input type="checkbox" class="goal-checkbox">
+                <span class="goal-text" contenteditable="false">My first goal</span>
+                <button class="delete-goal-button small-icon-button">
+                    <i class="material-icons-round">delete</i>
+                </button>
+            </li>
+            <li class="goal-item completed" data-goal-id="2">
+                <input type="checkbox" class="goal-checkbox" checked>
+                <span class="goal-text" contenteditable="false">A completed goal</span>
+                <button class="delete-goal-button small-icon-button">
+                    <i class="material-icons-round">delete</i>
+                </button>
+            </li>
+            -->
+        </ul>
+    </div>
+
+    <!-- Habit Tracker Widget -->
+    <div id="habit-tracker-widget" class="draggable-widget glass hidden">
+        <div class="widget-handle">⋮</div>
+        <h3>Daily Habits</h3>
+        <div class="habit-input-container">
+            <input type="text" id="newHabitInput" placeholder="Add a new habit...">
+            <button id="addHabitButton" class="add-button">
+                <i class="material-icons-round">add</i> Add
+            </button>
+        </div>
+        <ul class="habits-list" id="habitsListContainer">
+            <!-- Habit items will be dynamically populated here -->
+            <!-- Example Habit Item:
+            <li class="habit-item" data-habit-id="1">
+                <span class="habit-text">Drink water</span>
+                <button class="habit-done-button" aria-label="Mark as done">
+                    <i class="material-icons-round">check_box_outline_blank</i> 
+                </button>
+                <button class="delete-habit-button small-icon-button">
+                    <i class="material-icons-round">delete_outline</i>
+                </button>
+            </li>
+            <li class="habit-item done-today" data-habit-id="2">
+                <span class="habit-text">Exercise</span>
+                <button class="habit-done-button" aria-label="Mark as not done">
+                    <i class="material-icons-round">check_box</i>
+                </button>
+                <button class="delete-habit-button small-icon-button">
+                    <i class="material-icons-round">delete_outline</i>
+                </button>
+            </li>
+            -->
+        </ul>
+    </div>
+
+    <!-- Quick Links Widget -->
+    <div id="quick-links-widget" class="draggable-widget glass hidden">
+        <div class="widget-handle">⋮</div>
+        <div class="quick-links-header">
+          <h3>Quick Links</h3>
+          <button id="showAddLinkModalButton" class="add-link-button" title="Add new link">
+              <i class="material-icons-round">add_link</i>
+          </button>
+        </div>
+        <div class="quick-links-grid" id="quickLinksGridContainer">
+            <!-- Link items will be dynamically populated here -->
+            <!-- Example Link Item:
+            <a href="https://example.com" target="_blank" class="quick-link-item" data-link-id="1">
+                <img src="https://www.google.com/s2/favicons?domain=example.com&sz=32" alt="" class="quick-link-icon">
+                <span class="quick-link-title">Example</span>
+                <div class="quick-link-actions">
+                    <button class="edit-link-button small-icon-button" title="Edit link"><i class="material-icons-round">edit</i></button>
+                    <button class="delete-link-button small-icon-button" title="Delete link"><i class="material-icons-round">delete_outline</i></button>
+                </div>
+            </a>
+            -->
+        </div>
+    </div>
+
+    <!-- Add/Edit Quick Link Modal -->
+    <div id="addEditLinkModal" class="dialog-base hidden">
+        <div class="dialog-content medium-dialog"> <!-- Added medium-dialog for specific sizing -->
+            <div class="dialog-header">
+                <h3 id="linkModalTitle">Add New Link</h3>
+                <button id="closeLinkModalButton" class="close-button" title="Close">
+                    <i class="material-icons-round">close</i>
+                </button>
+            </div>
+            <div class="dialog-body">
+                <form id="linkForm">
+                    <input type="hidden" id="linkIdInput" />
+                    <div class="form-group">
+                        <label for="linkUrlInput">URL (e.g., https://example.com)</label>
+                        <input type="url" id="linkUrlInput" required placeholder="https://example.com" />
+                    </div>
+                    <div class="form-group">
+                        <label for="linkTitleInput">Title</label>
+                        <input type="text" id="linkTitleInput" required placeholder="My Awesome Site" />
+                    </div>
+                    <div class="form-group icon-preview-group">
+                        <label>Icon Preview</label>
+                        <img id="linkIconPreview" src="images/icon-32.png" alt="Icon Preview" class="quick-link-icon-preview" />
+                         <!-- Optional: Input for custom icon URL -->
+                         <!-- <input type="url" id="linkCustomIconUrlInput" placeholder="Optional: Custom icon URL" /> -->
+                    </div>
+                    <div class="dialog-actions">
+                        <button type="button" id="cancelLinkModalButton" class="form-button secondary">Cancel</button>
+                        <button type="submit" id="saveLinkButton" class="form-button primary">Save Link</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Site Blocker Widget -->
+    <div id="site-blocker-widget" class="draggable-widget glass hidden">
+        <div class="widget-handle">⋮</div>
+        <div class="site-blocker-header">
+            <h3>Site Blocker</h3>
+            <label class="switch">
+                <input type="checkbox" id="masterBlockerToggle">
+                <span class="slider round"></span>
+            </label>
+        </div>
+        <div class="site-blocker-input-container">
+            <input type="text" id="newBlockedSiteInput" placeholder="e.g., distracting.com">
+            <button id="addBlockedSiteButton" class="add-button">
+                <i class="material-icons-round">add_circle_outline</i> Add
+            </button>
+        </div>
+        <ul class="blocked-sites-list" id="blockedSitesListContainer">
+            <!-- Blocked site items will be dynamically populated here -->
+            <!-- Example Blocked Site Item:
+            <li class="blocked-site-item" data-hostname="example.com">
+                <span class="blocked-site-hostname">example.com</span>
+                <button class="delete-blocked-site-button small-icon-button">
+                    <i class="material-icons-round">remove_circle_outline</i>
+                </button>
+            </li>
+            -->
         </ul>
     </div>
 
